@@ -22,7 +22,6 @@ from utils.tuning import compute_tuning_wrapper
 from utils.gain_lib import *
 from utils.pair_lib import *
 from utils.plot_lib import * #get all the fixed color schemes
-from utils.rf_lib import filter_nearlabeled
 from utils.RRRlib import regress_out_behavior_modulation
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\TrialwiseModel\\')
@@ -37,12 +36,6 @@ sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset
 
 #%% Load all GR sessions: 
 sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
-
-#%% Remove sessions with too much drift in them:
-sessiondata         = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
-sessions_in_list    = np.where(~sessiondata['session_id'].isin(['LPE12013_2024_05_02','LPE10884_2023_10_20','LPE09830_2023_04_12']))[0]
-sessions            = [sessions[i] for i in sessions_in_list]
-nSessions           = len(sessions)
 
 #%%  Load data properly:
 calciumversion = 'deconv'

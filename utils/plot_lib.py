@@ -786,8 +786,8 @@ def get_clr_arealabelpairs(arealabelpairs):
     return itemgetter(*arealabelpairs)(palette)
 
 def get_clr_area_low_high():
-    c = np.array([["#C489FF", "#7C00F9"],  # V1lab-V1unl-PMunl
-                   ["#7BFFDE", "#009A74"]])  # PMlab-PMunl-V1unl
+    c = np.array([["#C489FF", "#4C0099"],  # V1lab-V1unl-PMunl
+                   ["#20FFC7", "#006149"]])  # PMlab-PMunl-V1unl
     return c
 
 def get_clr_area_labelpairs(area_labelpairs):
