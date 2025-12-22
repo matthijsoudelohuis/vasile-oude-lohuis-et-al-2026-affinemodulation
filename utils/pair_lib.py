@@ -17,11 +17,16 @@ def compute_pairwise_metrics(sessions):
     sessions = compute_pairwise_delta_rf(sessions)
     return sessions
 
-def filter_nearlabeled(ses,radius=50,only_V1_PM=False):
+def filter_nearlabeled(ses,radius=50,only_V1_PM=False,metric='xyz'):
 
-    if not hasattr(ses,'distmat_xyz'):
-        [ses] = compute_pairwise_metrics([ses])
-    temp = ses.distmat_xyz.copy()
+    if metric == 'xyz':
+        if not hasattr(ses,'distmat_xyz'):
+            [ses] = compute_pairwise_metrics([ses])
+        temp = ses.distmat_xyz.copy()
+    elif metric == 'xy':
+        if not hasattr(ses,'distmat_xy'):
+            [ses] = compute_pairwise_metrics([ses])
+        temp = ses.distmat_xy.copy()
     np.fill_diagonal(temp,0)  #this is to include the labeled neurons themselves
     closemat = temp[ses.celldata['redcell']==1,:] <= radius
     idx = np.any(closemat,axis=0)
