@@ -52,8 +52,7 @@ sessions,nSessions   = filter_sessions(protocols = 'GR')
 #%%  Load data properly:
 calciumversion = 'deconv'
 for ises in range(nSessions):
-    sessions[ises].load_respmat(load_behaviordata=True, load_calciumdata=True,load_videodata=True,
-                                calciumversion=calciumversion,keepraw=False)
+    sessions[ises].load_respmat(calciumversion=calciumversion)
 
 #%% Compute Tuning Metrics (gOSI, gDSI etc.)
 sessions = compute_tuning_wrapper(sessions)
@@ -121,6 +120,64 @@ for ises in range(nSessions):
 
 # plt.imshow(sessions[ises].respmat,cmap='RdBu_r',vmin=0,vmax=100)
 # plt.imshow(sessions[ises].respmat_behavout,cmap='RdBu_r',vmin=0,vmax=100)
+
+# %%
+ #####  ####### ### #       #          ####### ######  ###    #    #        #####  
+#     #    #     #  #       #             #    #     #  #    # #   #       #     # 
+#          #     #  #       #             #    #     #  #   #   #  #       #       
+ #####     #     #  #       #             #    ######   #  #     # #        #####  
+      #    #     #  #       #             #    #   #    #  ####### #             # 
+#     #    #     #  #       #             #    #    #   #  #     # #       #     # 
+ #####     #    ### ####### #######       #    #     # ### #     # #######  #####  
+
+#%% 
+# respmat_videoME = []
+# for ises in range(nSessions):   
+#     respmat_videoME.append(list(sessions[ises].respmat_videome))
+maxvideome              = 0.2
+maxrunspeed             = 0.5
+
+respmat_videoME = np.array([])
+respmat_runspeed = np.array([])
+for ises in range(nSessions):
+    ses_videoME = sessions[ises].respmat_videome - np.nanpercentile(sessions[ises].respmat_videome,0)
+    ses_videoME = ses_videoME/np.nanpercentile(ses_videoME,100)
+    respmat_videoME = np.append(respmat_videoME,ses_videoME)
+    respmat_runspeed = np.append(respmat_runspeed,sessions[ises].respmat_runspeed)
+
+idx_T_still = np.logical_and(respmat_videoME < maxvideome,
+                            respmat_runspeed < maxrunspeed)
+fig,axes = plt.subplots(2,2,figsize=(3,3))
+ax = axes[0,0]
+sns.histplot(respmat_runspeed[idx_T_still],bins=np.linspace(-1,60,200),color='black',
+             element='step',stat='count',fill=True,ax=ax)
+sns.histplot(respmat_runspeed[~idx_T_still],bins=np.linspace(-1,60,200),color='grey',
+             element='step',stat='count',fill=True,ax=ax)
+
+ax = axes[1,1]
+# sns.histplot(respmat_videoME,bins=np.linspace(0,1,50),element='step',stat='probability',fill=False,ax=ax)
+sns.histplot(y=respmat_videoME[idx_T_still],bins=np.linspace(0,1,200),color='black',
+             element='step',stat='count',fill=True,ax=ax)
+sns.histplot(y=respmat_videoME[~idx_T_still],bins=np.linspace(0,1,200),color='grey',
+             element='step',stat='count',fill=True,ax=ax)
+ax.text(0.4,0.8,'Still (Included)',color='black',transform=ax.transAxes,fontsize=9)
+ax.text(0.4,0.7,'Moving (Excluded)',color='grey',transform=ax.transAxes,fontsize=9)
+
+
+ax = axes[1,0]
+# sns.scatterplot(ax=ax,x=respmat_videoME,y=respmat_runspeed,alpha=0.25,s=4,hue=idx_T_still,
+sns.scatterplot(ax=ax,x=respmat_runspeed,y=respmat_videoME,alpha=0.25,s=4,hue=idx_T_still,
+                palette=['grey','black'],legend=False)
+# ax.legend(['Still','Moving'],fontsize=9,frameon=False)
+ax.text(0.3,0.6,'n = %d/%d \nstill trials \n(%.1f%%)' % (np.sum(idx_T_still),len(idx_T_still),np.sum(idx_T_still)/len(idx_T_still)*100),
+        transform=ax.transAxes,fontsize=6)
+ax.set_ylabel('Video ME (norm.)')
+ax.set_xlabel('Running speed (cm/s)')
+# plt.tight_layout()
+axes[0,1].axis('off')
+sns.despine(fig=fig, top=True, right=True,offset=0)
+my_savefig(fig,savedir,'StillTrials_Selection')
+
 
 #%% 
 ises = 0
@@ -445,7 +502,8 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-nboots                  = 100
+nboots                  = 0
+# nboots                  = 100
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
@@ -566,14 +624,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         tempsig = (tempsig<alphathr) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
 
-# # Fit gain coefficient for each neuron and compare labeled and unlabeled neurons:
-# for iN in tqdm(range(nCells),total=nCells,desc='Fitting gain for each neuron'):
-#     for ialp,alp in enumerate(arealabelpairs):
-#         xdata = mean_resp_split[ialp,:,0,iN]
-#         ydata = mean_resp_split[ialp,:,1,iN]
-#         params_regress[iN,ialp,:] = linregress(xdata,ydata)[:3]
-
-#%% Compute same metric as Flora:
+# Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
@@ -1135,7 +1186,7 @@ plt.tight_layout()
 
 #%% Show for positive and negatively correlated neurons only:
 params_regress_mean = np.full((narealabelpairs,3),np.nan)
-clrs_arealabelpairs = ['green','purple']
+
 legendlabels = ['FF','FB']
 # clrs_arealabelpairs = ['grey','pink','grey','red']
 fig,axes = plt.subplots(2,3,figsize=(7,4))
@@ -1191,7 +1242,6 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 
 
 #%% Show correlation of slope and offset
-clrs_arealabelpairs = ['green','purple']
 fig,axes = plt.subplots(1,2,figsize=(5,2.5),sharey=True,sharex=True)
 for ialp,alp in enumerate(legendlabels): #Mult and Add
     ax = axes[ialp]
@@ -1217,7 +1267,7 @@ for ialp,alp in enumerate(legendlabels): #Mult and Add
     ax.text(0.5,0.8,'r = %.2f' % (stats.pearsonr(x,y)[0]),transform=ax.transAxes,fontsize=9) #print(stats.pearsonr(x,y)[0])
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Corr_Mult_Add_Mean_FF_FB_MinRespSubtracted_GR%dsessions' % (nSessions), formats = ['png'])
+my_savefig(fig,savedir,'Corr_Mult_Add_Mean_FF_FB_MinRespSubtracted_GR%dsessions' % (nSessions))
 # my_savefig(fig,savedir,'Corr_Mult_Add_Mean_FF_FB_BaselineSubtracted_GR%dsessions' % (nSessions), formats = ['png'])
 # my_savefig(fig,savedir,'Corr_Mult_Add_Mean_FF_FB_GR%dsessions' % (nSessions), formats = ['png'])
 
