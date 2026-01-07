@@ -16,7 +16,7 @@ from statsmodels.formula.api import ols
 
 # os.chdir('e:\\Python\\molanalysis')
 # os.chdir('c:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.get_data_folder import get_local_drive
 from loaddata.session_info import filter_sessions,load_sessions
@@ -204,7 +204,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
                 for i,ori in enumerate(oris):
                     idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
                     idx_K1              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
-                    idx_K2              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
+                    idx_K2              = np.random.choice(np.setdiff1d(np.where(idx_T)[0],idx_K1),size=np.sum(idx_T)*perc//100,replace=False)
                     meanrespboot[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
                     meanrespboot[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
                 for n in range(N):
@@ -234,9 +234,9 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
         tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
-        tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
+        tempsig           = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
         corrdata_cells[ialp,idx_ses] = tempcorr
-        tempsig = (tempsig<alphathr) * np.sign(tempcorr)
+        tempsig         = (tempsig<alphathr) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
 
 # Compute same metric as Flora:
@@ -244,7 +244,7 @@ rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
 
-# # %%
+# %%
 # celldata['meanact']     = np.nanmean(mean_resp_split,axis=(0,1,2))
 # celldata['slope']       = np.nanmean(params_regress[:,:,0],axis=1)
 # celldata['offset']      = np.nanmean(params_regress[:,:,1],axis=1)
@@ -252,7 +252,7 @@ rangeresp = np.nanmax(rangeresp,axis=(0,1))
 # celldata['rangeresp']   = rangeresp
 
 #%% 
-nresamples = 100
+nresamples = 1
 clrs_arealabelpairs = ['green','purple','orange','red','blue','grey']
 legendlabels = ['$V1_{PM}-V1_{ND}>PM$',
                 '$PM_{V1}-PM_{ND}>V1$',
@@ -262,22 +262,30 @@ legendlabels = ['$V1_{PM}-V1_{ND}>PM$',
 narealabelpairs = len(arealabelpairs)
 
 # clrs_arealabelpairs = ['grey','pink','grey','red']
-fig,axes = plt.subplots(1,2,figsize=(6,3))
+fig,axes = plt.subplots(1,2,figsize=(5,2.5))
 # fig,axes = plt.subplots(1,2,figsize=(12,6))
 for iparam in range(2):
     ax = axes[iparam]
     if iparam == 0:
         ax.set_xlabel('Multiplicative Slope')
-        bins = np.arange(0,2,0.015)
+        # bins = np.arange(0,2,0.015)
+        bins = np.arange(-0.5,5,0.015)
         ax.axvline(1,color='grey',ls='--',linewidth=1)
     else:
         ax.set_xlabel('Additive Offset')
-        bins = np.arange(-0.025,0.04,0.0001)
+        # bins = np.arange(-0.025,0.04,0.0001)
+        bins = np.arange(-0.05,0.1,0.0001)
         ax.axvline(0,color='grey',ls='--',linewidth=1)
     
     handles = []
 
-    idx_N =  rangeresp>minrangeresp
+    idx_N = rangeresp>minrangeresp
+    # idx_N = np.all((
+            # rangeresp>minrangeresp,
+            # # celldata['noise_level']<maxnoiselevel,
+            # ),axis=0)
+    
+    # idx_N =  rangeresp>minrangeresp
     for ialp,alp in enumerate(arealabelpairs):
         if ialp<2:
             continue
@@ -290,84 +298,39 @@ for iparam in range(2):
                 color=clrs_arealabelpairs[ialp],marker='v')[0])
     ax.legend(handles,legendlabels[2:],fontsize=9,frameon=False)
 
-    #Test for effect in AL:
-    h,p = stats.ttest_ind(params_regress[idx_N,2,iparam],
-                            params_regress[idx_N,3,iparam],nan_policy='omit')
-    p = np.clip(p * narealabelpairs * 2,0,1) #bonferroni + clip
-    ax.text(0.5, 0.5, '%s,p=%1.2f' % (get_sig_asterisks(p,return_ns=True),p), transform=ax.transAxes)
-    print('p=%1.2f' % (p))
-
-    #Statistics:
-    df = pd.DataFrame({'var': params_regress[idx_N,:,iparam].flatten(),
-                       'arealabelpair': np.tile(arealabelpairs,np.sum(idx_N))})
-    df.dropna(inplace=True)
-    df['source'] = ''
-    df.loc[df['arealabelpair'].str.contains('V1lab'),'source'] = 'V1lab'
-    df.loc[df['arealabelpair'].str.contains('PMlab'),'source'] = 'PMlab'
-    df['target'] = 'V1PM'
-    df.loc[df['arealabelpair'].str.contains('AL'),'target'] = 'AL'
-
-    formula = "var ~ source*target" #model with interaction
-    lm = ols(formula, df).fit()
-    table = anova_lm(lm, typ=2) # Type 2 ANOVA DataFrame
-    print(table)
-    print('Interaction effect: p=%1.2f' % (table.loc['source:target','PR(>F)']))
-
-    #The number of recorded neurons in AL is smaller than those in V1 and PM:
-    #pick nALneurons random entries from the entries that have 'target' set to 'V1PM' to match the number of target categories
-    idx_V1PM = np.where(df['target'] == 'V1PM')[0] 
-    idx_AL = np.where(df['target'] == 'AL')[0]
-    # print(np.sum(df['target'] == 'AL'))
-    # print(np.sum(df['target'] == 'V1PM'))
-    fracsig = np.zeros(nresamples)
-    for isub in range(nresamples):
-        idx_V1PM_to_pick = np.random.choice(idx_V1PM, size=len(idx_AL), replace=False)
-
-        df_sub = df.iloc[np.concatenate([idx_AL, idx_V1PM_to_pick]),:]
-
-        lm = ols(formula, df_sub).fit()
-        table = anova_lm(lm, typ=2) # Type 2 ANOVA DataFrame
-        fracsig[isub] = table.loc['source:target','PR(>F)']<=0.05
-
-    print('%2.1f%% of resamples had a significant interaction' % (np.sum(fracsig)/nresamples*100))
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'AL_HistCoefs_StillTrials_gOSI05_%dGRsessions' % (nSessions), formats = ['png'])
+my_savefig(fig,savedir,'AL_HistCoefs_StillTrials_%dGRsessions' % (nSessions))
 # my_savefig(fig,savedir,'FF_FB_affinemodulation_StillTrials_gOSI05_cumhistcoefs_%dGRsessions' % (nSessions), formats = ['png'])
 
 #%%
 
-nresamples = 10
+nresamples = 1000
 narealabelpairs = len(arealabelpairs)
 
-# clrs_arealabelpairs = ['grey','pink','grey','red']
-fig,axes = plt.subplots(1,2,figsize=(6,3))
-# fig,axes = plt.subplots(1,2,figsize=(12,6))
+fig,axes = plt.subplots(1,2,figsize=(5,2.5))
 for iparam in range(2):
     ax = axes[iparam]
     handles = []
-
     idx_N =  rangeresp>minrangeresp
-    # idx_N =  rangeresp
-    # idx_N = celldata['gOSI']>0.4
-    
     for ialp,alp in enumerate(arealabelpairs):
-        ax.errorbar(ialp,np.nanmean(params_regress[idx_N,ialp,iparam]),
+        ax.errorbar(ialp,np.nanmean(params_regress[idx_N,ialp,iparam]) + 0.2*(ialp<2)*(iparam==0),
                     yerr=stats.sem(params_regress[idx_N,ialp,iparam],nan_policy='omit'),
                     color=clrs_arealabelpairs[ialp],
                     marker='o',markersize=8,linewidth=1.5,elinewidth=1.5,capsize=5)
     ax.legend(handles,legendlabels[2:],fontsize=9,frameon=False)
-
+    ax.set_title(['Multiplicative Slope','Additive Offset'][iparam],fontsize=10)
     #Test for effect in AL:
     h,p = stats.ttest_ind(params_regress[idx_N,2,iparam],
                             params_regress[idx_N,3,iparam],nan_policy='omit')
     p = np.clip(p * narealabelpairs * 2,0,1) #bonferroni + clip
-    ax.text(0.5, 0.5, '%s,p=%1.2f' % (get_sig_asterisks(p,return_ns=True),p), transform=ax.transAxes)
-    print('p=%1.2f' % (p))
+    ax.text(0.75, 0.5, '%s,p=%1.2f' % (get_sig_asterisks(p,return_ns=True),p), transform=ax.transAxes)
+    # print('p=%1.2f' % (p))
 
     #Statistics:
     df = pd.DataFrame({'var': params_regress[idx_N,:,iparam].flatten(),
                        'arealabelpair': np.tile(arealabelpairs,np.sum(idx_N))})
+    
     df.dropna(inplace=True)
     df['source'] = ''
     df.loc[df['arealabelpair'].str.contains('V1lab'),'source'] = 'V1lab'
@@ -377,16 +340,24 @@ for iparam in range(2):
 
     formula = "var ~ source*target" #model with interaction
     lm = ols(formula, df).fit()
-    table = anova_lm(lm, typ=2) # Type 2 ANOVA DataFrame
+    table = anova_lm(lm, typ=3) # Type 3 ANOVA (testing interaction first on balanced data)
+    for name in ['source','target','source:target']:
+        print('%s effect: F=%2.1f,p=%1.3f' % (name,
+                                                    table.loc[name,'F'],
+                                                    table.loc[name,'PR(>F)']))
     print(table)
-    print('Interaction effect: p=%1.2f' % (table.loc['source:target','PR(>F)']))
-
+    # print('Interaction effect: F=%1.4f,p=%1.4f' % (table.loc['source:target','F'],
+    #                                                       table.loc['source:target','PR(>F)']))
+    for ialp,alp in enumerate(arealabelpairs):
+        print(alp,np.sum(df['arealabelpair'] == alp))
+    # df['arealabelpair'].unique()
+    # df['source'].unique()
+    # df['target'].unique()
+    
     #The number of recorded neurons in AL is smaller than those in V1 and PM:
     #pick nALneurons random entries from the entries that have 'target' set to 'V1PM' to match the number of target categories
     idx_V1PM = np.where(df['target'] == 'V1PM')[0] 
     idx_AL = np.where(df['target'] == 'AL')[0]
-    # print(np.sum(df['target'] == 'AL'))
-    # print(np.sum(df['target'] == 'V1PM'))
     fracsig = np.zeros(nresamples)
     for isub in range(nresamples):
         idx_V1PM_to_pick = np.random.choice(idx_V1PM, size=len(idx_AL), replace=False)
@@ -394,15 +365,16 @@ for iparam in range(2):
         df_sub = df.iloc[np.concatenate([idx_AL, idx_V1PM_to_pick]),:]
 
         lm = ols(formula, df_sub).fit()
-        table = anova_lm(lm, typ=2) # Type 2 ANOVA DataFrame
+        table = anova_lm(lm, typ=3) # Type 3 ANOVA DataFrame
         fracsig[isub] = table.loc['source:target','PR(>F)']<=0.05
-
     print('%2.1f%% of resamples had a significant interaction' % (np.sum(fracsig)/nresamples*100))
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'AL_HistCoefs_StillTrials_gOSI05_%dGRsessions' % (nSessions), formats = ['png'])
-# my_savefig(fig,savedir,'FF_FB_affinemodulation_StillTrials_gOSI05_cumhistcoefs_%dGRsessions' % (nSessions), formats = ['png'])
+for ax in axes:
+    ax.set_xticks(range(narealabelpairs),legendlabels,rotation=45,ha='right',fontsize=7)
+    # ax.set_xlabel('Area-label pair',fontsize=9)
 
+# my_savefig(fig,savedir,'AL_BarCoefs_StillTrials_%dGRsessions' % (nSessions))
 
 
 #%%
@@ -417,7 +389,11 @@ for ialp,alp in enumerate(arealabelpairs):
     for imult, mult in enumerate([1,0,-1]):
         for iadd, add in enumerate([-1,0,1]):
             idx_N =  np.all((
-                rangeresp>minrangeresp,
+                    rangeresp>minrangeresp,
+                    rangeresp>0.05,
+                    # celldata['nearby'],
+                    # celldata['gOSI']>0.5,
+                    # celldata['noise_level']<maxnoiselevel,
                      ),axis=0)
             Nsig = np.sum(np.all((
                                 sig_params_regress[idx_N,ialp,0]==mult,
@@ -428,8 +404,8 @@ for ialp,alp in enumerate(arealabelpairs):
             nsigmat[imult,iadd,ialp] = Nsig
             ntotalmat[imult,iadd,ialp] = Ntotal
             fracmat[imult,iadd,ialp] = frac
-fracmat[:,:,4] = fracmat[:,:,2] - fracmat[:,:,0]
-fracmat[:,:,5] = fracmat[:,:,3] - fracmat[:,:,1]
+fracmat[:,:,4] = fracmat[:,:,0] - fracmat[:,:,2]
+fracmat[:,:,5] = fracmat[:,:,1] - fracmat[:,:,3]
 
 for imult, mult in enumerate([1,0,-1]):
     for iadd, add in enumerate([-1,0,1]):
@@ -459,7 +435,14 @@ for ialp in range(narealabelpairs+ndiffs):
     ax.set_xlabel('Addition')
     if ialp == 0:
         ax.set_ylabel('Multiplicative')
-    ax.set_title(legendlabels[ialp] if ialp < narealabelpairs else 'Diff (FB-FF)')
+    if ialp < narealabelpairs:
+        ax.set_title(legendlabels[ialp])
+    elif ialp == narealabelpairs:
+        ax.set_title('Diff (FF: PM-AL)')
+    else:
+        ax.set_title('Diff (FB: V1-AL)')
+    # ax.set_title(legendlabels[ialp] if ialp < narealabelpairs else 'Diff (FB-FF)')
+    # ax.set_title(legendlabels[ialp] if ialp < narealabelpairs else 'Diff (FB-FF)')
     for i in range(3):
         for j in range(3):
             if ialp != narealabelpairs:

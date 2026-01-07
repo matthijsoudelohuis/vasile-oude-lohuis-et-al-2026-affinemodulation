@@ -137,6 +137,7 @@ for ises in range(nSessions):
 #     respmat_videoME.append(list(sessions[ises].respmat_videome))
 maxvideome              = 0.2
 maxrunspeed             = 0.5
+maxnoiselevel           = 20
 
 respmat_videoME = np.array([])
 respmat_runspeed = np.array([])
@@ -208,7 +209,6 @@ sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
 #%% Correlation matrix between the different populations
 arealabelpairs  = ['V1unl','V1lab','PMunl','PMlab']
 narealabelpairs = len(arealabelpairs)
-maxnoiselevel=20
 corrmat = np.full((narealabelpairs,narealabelpairs,nSessions),np.nan)
 for ises in range(nSessions):
     idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,

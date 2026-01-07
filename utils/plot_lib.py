@@ -324,8 +324,12 @@ def add_colorbar_outside(im,ax):
 ## areas, protocols, mice, stimuli, etc. 
 
 def get_clr_areas(areas):
-    palette       = {'V1'  : sns.xkcd_rgb['seaweed'],
-                    'PM' : sns.xkcd_rgb['barney'],
+    # palette       = {'V1'  : sns.xkcd_rgb['seaweed'],
+    #                 'PM' : sns.xkcd_rgb['barney'],
+    #                 'AL' : sns.xkcd_rgb['clear blue'],
+    #                 'RSP' : sns.xkcd_rgb['orangered']}
+    palette       = {'V1'  : '#9933FF',
+                    'PM' : '#00CC99',
                     'AL' : sns.xkcd_rgb['clear blue'],
                     'RSP' : sns.xkcd_rgb['orangered']}
     return itemgetter(*areas)(palette)

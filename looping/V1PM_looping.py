@@ -491,7 +491,7 @@ for idir in range(2):
     for icat in range(3):
         ax = axes[idir,icat]
         if icat < 2:
-            vmin,vmax = 0,25
+            vmin,vmax = 0,15
             # cmap = 'Purples'
             cmap = 'viridis'
             # cmap = 'magma'

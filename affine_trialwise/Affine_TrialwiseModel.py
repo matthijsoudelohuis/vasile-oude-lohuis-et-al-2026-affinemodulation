@@ -12,7 +12,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import r2_score
 from pylab import *
 
-os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.get_data_folder import get_local_drive
 
@@ -857,29 +857,6 @@ print(result.summary())
 maxvideome              = 0.2
 maxrunspeed             = 0.5
 
-respmat_videoME = np.array([])
-respmat_runspeed = np.array([])
-for ises in range(nSessions):
-
-    # respmat_videoME = np.append(respmat_videoME,sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome))
-    respmat_videoME = np.append(respmat_videoME,sessions[ises].respmat_videome/np.nanpercentile(sessions[ises].respmat_videome,100))
-    respmat_runspeed = np.append(respmat_runspeed,sessions[ises].respmat_runspeed)
-
-# sns.histplot(respmat_videoME,bins=np.linspace(0,np.nanpercentile(respmat_videoME,99),50),element='step',stat='probability',fill=False)
-# sns.histplot(respmat_runspeed,bins=np.linspace(-1,np.nanpercentile(respmat_runspeed,99),100),element='step',stat='probability',fill=False)
-
-idx_T_still = np.logical_and(respmat_videoME < maxvideome,
-                            respmat_runspeed < maxrunspeed)
-fig,ax = plt.subplots(1,1,figsize=(3,3))
-
-sns.scatterplot(ax=ax,x=respmat_videoME,y=respmat_runspeed,alpha=0.25,s=4,hue=idx_T_still,
-                palette=['grey','black'],legend=False)
-# ax.legend(['Still','Moving'],fontsize=9,frameon=False)
-ax.text(0.6,0.8,'n = %d/%d \nstill trials \n(%.1f%%)' % (np.sum(idx_T_still),len(idx_T_still),np.sum(idx_T_still)/len(idx_T_still)*100),transform=ax.transAxes,fontsize=9)
-ax.set_xlabel('Video ME (norm.)')
-ax.set_ylabel('Running speed (cm/s)')
-sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'StillTrials_Selection',formats = ['png'])
 
 
 #%% Check whether epochs of endogenous high feedforward activity are associated with a specific modulation of the 
@@ -1210,14 +1187,14 @@ for ises in range(nSessions):
     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
 
-#%% Check whether epochs of endogenous high feedforward activity are associated with a specific modulation of the 
+#%% Check whether feedback from PM to V1 modulates V1 depending on the laminar origin of the feedback
 
 arealabelpairs          = [
                             'PMlabL2/3-PMunlL2/3-V1unlL2/3',
                             'PMlabL5-PMunlL5-V1unlL2/3',
                             ]
 narealabelpairs         = len(arealabelpairs)
-legendlabels            = np.array(['FBL23','FBL5'])
+legendlabels            = np.array(['PML23->V1','PML5->V1'])
 
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 nCells                  = len(celldata)
@@ -1310,7 +1287,8 @@ for imodel,model in enumerate([1,2]): #Mult and Add
     # for ipred in range(nPredictors):
     ax = axes[imodel]
     idx_N = np.all((
-            celldata['gOSI']>0.3,
+            # celldata['gOSI']>0.3,
+            rangeresp > minrangeresp,
             # celldata['nearby'],
                 ),axis=0)
     ymean = np.nanmean(cvR2_preds[:,model,ipred,idx_N],axis=1)
@@ -1331,21 +1309,18 @@ for imodel,model in enumerate([1,2]): #Mult and Add
     ax.set_title(AffModels[model],fontsize=11)
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'FB_PMLayers_V1_affinemodulation_dR2_%dsessions' % (nSessions), formats = ['png'])
+for ax in axes: 
+    ax.set_xticks([0,1],labels=legendlabels, rotation=45, ha='right')
+my_savefig(fig,savedir,'FB_PMLayers_V1_affinemodulation_dR2_%dsessions' % (nSessions))
 
 
-#%% Check whether epochs of endogenous high feedforward activity are associated with a specific modulation of the 
+#%% Check whether feedforward from V1 to PM modulates PM depending on the target layer
 arealabelpairs  = [
                     'V1lab-V1unl-PMunlL2/3',
                     'V1lab-V1unl-PMunlL5',
-                    'PMlab-PMunl-V1unlL2/3',
-                    'PMlab-PMunl-V1unlL5',
                     ]
-legendlabels     = ['FF - PML2/3',
-                    'FF - PML5',
-                    'FB - V1L2/3',
-                    'FB - V1L5',
-                    ]
+legendlabels            = np.array(['V1->PML23','V1->PML5'])
+
 # clrs_arealabelpairs = ['green','green','purple','purple']
 clrs_arealabelpairs = get_clr_arealabelpairs(arealabelpairs)
 
@@ -1428,34 +1403,69 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing affine modulat
             cvR2_preds[ialp,:,:,idx_ses] = tempcvR2_preds
 
 #%% 
+#%% 
 ipred = -1
-fig,axes = plt.subplots(1,2,figsize=(6,3),sharey='row',sharex=True)
+fig,axes = plt.subplots(1,2,figsize=(3,1*2),sharey='row',sharex=True)
 for imodel,model in enumerate([1,2]): #Mult and Add
     # for ipred in range(nPredictors):
     ax = axes[imodel]
     idx_N = np.all((
-            celldata['gOSI']>0,
+            celldata['gOSI']>0.2,
+            # rangeresp > minrangeresp,
             # celldata['nearby'],
                 ),axis=0)
     ymean = np.nanmean(cvR2_preds[:,model,ipred,idx_N],axis=1)
     yerror = np.nanstd(cvR2_preds[:,model,ipred,idx_N],axis=1) / np.sqrt(np.sum(idx_N)/2)
-    ax.bar(range(4),height=ymean,yerr=yerror,color=clrs_arealabelpairs)#,errorbar=('ci', 95))
-    ax.errorbar(range(4),y=ymean,yerr=yerror,linestyle='', color='k',
+    ax.bar([0,1],height=ymean,yerr=yerror,color=clrs_arealabelpairs)#,errorbar=('ci', 95))
+    ax.errorbar([0,1],y=ymean,yerr=yerror,linestyle='', color='k',
                 linewidth=4)
     ax.text(0,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[0,model,ipred,idx_N])),fontsize=6,ha='center')
     ax.text(1,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[1,model,ipred,idx_N])),fontsize=6,ha='center')
-    ax.text(2,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[2,model,ipred,idx_N])),fontsize=6,ha='center')
-    ax.text(3,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[3,model,ipred,idx_N])),fontsize=6,ha='center')
-    ax.set_xticks(range(4),labels=legendlabels,fontsize=8,rotation=45)
-    # h,p = stats.ttest_ind(cvR2_preds[0,model,ipred,idx_N],
-    #                     cvR2_preds[1,model,ipred,idx_N],nan_policy='omit')
-    # p = p * narealabelpairs
-    # add_stat_annotation(ax, 0.2, 0.8,ymean.max()*1.1, p, h=0)
-    # ax_nticks(ax, 3)
+    ax.set_xticks([0,1],labels=legendlabels)
+    h,p = stats.ttest_ind(cvR2_preds[0,model,ipred,idx_N],
+                        cvR2_preds[1,model,ipred,idx_N],nan_policy='omit')
+    p = p * narealabelpairs
+    add_stat_annotation(ax, 0.2, 0.8,ymean.max()*1.1, p, h=0)
+    ax_nticks(ax, 3)
     if imodel == 0:
         ax.set_ylabel(u'$\Delta R^2$')
     ax.set_title(AffModels[model],fontsize=11)
 plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True,offset=3)
+for ax in axes: 
+    ax.set_xticks([0,1],labels=legendlabels, rotation=45, ha='right')
+
+# ipred = -1
+# fig,axes = plt.subplots(1,2,figsize=(6,3),sharey='row',sharex=True)
+# for imodel,model in enumerate([1,2]): #Mult and Add
+#     # for ipred in range(nPredictors):
+#     ax = axes[imodel]
+#     idx_N = np.all((
+#             celldata['gOSI']>0,
+#             # celldata['nearby'],
+#                 ),axis=0)
+#     ymean = np.nanmean(cvR2_preds[:,model,ipred,idx_N],axis=1)
+#     yerror = np.nanstd(cvR2_preds[:,model,ipred,idx_N],axis=1) / np.sqrt(np.sum(idx_N)/2)
+#     ax.bar(range(4),height=ymean,yerr=yerror,color=clrs_arealabelpairs)#,errorbar=('ci', 95))
+#     ax.errorbar(range(4),y=ymean,yerr=yerror,linestyle='', color='k',
+#                 linewidth=4)
+#     ax.text(0,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[0,model,ipred,idx_N])),fontsize=6,ha='center')
+#     ax.text(1,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[1,model,ipred,idx_N])),fontsize=6,ha='center')
+#     ax.text(2,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[2,model,ipred,idx_N])),fontsize=6,ha='center')
+#     ax.text(3,ymean.max()/10,'n=%d' % np.sum(~np.isnan(cvR2_preds[3,model,ipred,idx_N])),fontsize=6,ha='center')
+#     ax.set_xticks(range(4),labels=legendlabels,fontsize=8,rotation=45)
+#     # h,p = stats.ttest_ind(cvR2_preds[0,model,ipred,idx_N],
+#     #                     cvR2_preds[1,model,ipred,idx_N],nan_policy='omit')
+#     # p = p * narealabelpairs
+#     # add_stat_annotation(ax, 0.2, 0.8,ymean.max()*1.1, p, h=0)
+#     # ax_nticks(ax, 3)
+#     if imodel == 0:
+#         ax.set_ylabel(u'$\Delta R^2$')
+#     ax.set_title(AffModels[model],fontsize=11)
+# plt.tight_layout()
 # sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'FF_FB_TargetLayers_affinemodulation_dR2_%dsessions' % (nSessions), formats = ['png'])
+# for ax in axes: 
+#     ax.set_xticks([0,1],labels=legendlabels, rotation=45, ha='right')
+
+my_savefig(fig,savedir,'FF_PMLayers_V1_affinemodulation_dR2_%dsessions' % (nSessions))
 
