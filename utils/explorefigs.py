@@ -40,7 +40,8 @@ def plot_excerpt(ses, trialsel=None, neuronsel=None, plot_neural=True, plot_beha
         tstart  = ses.sessiondata['tStart'][0] + 30
         tstop   = ses.sessiondata['tEnd'][0]
         
-    fig, ax = plt.subplots(figsize=[9, 12])
+    cm = 1/2.54  # centimeters in inches
+    fig, ax = plt.subplots(figsize=[15*cm, 15*cm])
     counter = 0
     if plot_neural:
         if neural_version == 'traces':
@@ -55,7 +56,7 @@ def plot_excerpt(ses, trialsel=None, neuronsel=None, plot_neural=True, plot_beha
         counter = plot_behavioral_traces(
             ses, ax, tstart,tstop, counter=counter)
 
-    plot_stimuli(ses, trialsel, ax)
+    plot_stimuli(ses, trialsel, ax,counter)
 
     pos = ax.get_position()
     ax.set_position([pos.x0, pos.y0, pos.width * 0.9, pos.height])
@@ -72,15 +73,15 @@ def plot_excerpt(ses, trialsel=None, neuronsel=None, plot_neural=True, plot_beha
     return fig
 
 
-def plot_norm_trace(x, y, offset=0, clr='k'):
+def plot_norm_trace(x, y, offset=0, clr='k',multfactor=1):
     min_max_scaler = preprocessing.MinMaxScaler()
     y = np.array(y)
-    y = min_max_scaler.fit_transform(y[:, np.newaxis])
+    y = min_max_scaler.fit_transform(y[:, np.newaxis])*multfactor
     handle = plt.plot(x, y + offset, linewidth=0.5, color=clr)[0]
     return handle
 
 
-def plot_stimuli(ses, trialsel, ax):
+def plot_stimuli(ses, trialsel, ax,counter):
 
     # Add stimuli:
     if ses.protocol == 'GR':
@@ -88,7 +89,7 @@ def plot_stimuli(ses, trialsel, ax):
         rgba_color = plt.get_cmap('hsv', lut=16)(np.linspace(0, 1, len(oris)))
 
         for i in np.arange(trialsel[0], trialsel[1]):
-            ax.add_patch(plt.Rectangle([ses.trialdata['tOnset'][i], -1000], 1, 2000, alpha=0.1, linewidth=0,
+            ax.add_patch(plt.Rectangle([ses.trialdata['tOnset'][i], 0], 1, counter, alpha=0.1, linewidth=0,
                                        facecolor=rgba_color[np.where(oris == ses.trialdata['Orientation'][i])]))
 
         handles = []
@@ -154,7 +155,7 @@ def plot_behavioral_traces(ses, ax, tstart,tstop, nvideoPCs=8, counter=0):
     for iPC in range(nvideoPCs):
         motionenergy = ses.videodata['videoPC_%d' % iPC][idx_V]
         handles.append(plot_norm_trace(
-            ts_V[idx_V], motionenergy, counter, clr=clrs[iPC]))
+            ts_V[idx_V], motionenergy, counter, clr=clrs[iPC]),multfactor=2)
         # labels.append('videoPC%d' %iPC)
         counter -= 1
 
@@ -215,7 +216,7 @@ def plot_neural_traces(ses, ax, tstart, tstop , neuronsel=None, counter=0, nexce
     scaleddata      = min_max_scaler.fit_transform(scaleddata)
     scaleddata      = scaleddata[np.logical_and(
         ses.ts_F > tstart, ses.ts_F < tstop)]
-    scaleddata      = min_max_scaler.fit_transform(scaleddata)
+    scaleddata      = min_max_scaler.fit_transform(scaleddata)*2
 
     areas           = np.unique(ses.celldata['roi_name'])
     labeled         = np.unique(ses.celldata['redcell'])
