@@ -17,7 +17,7 @@ from statsmodels.stats.anova import AnovaRM
 
 # os.chdir('e:\\Python\\molanalysis')
 # os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.session_info import *
 from loaddata.get_data_folder import get_local_drive
@@ -30,6 +30,10 @@ from utils.regress_lib import *
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\Decoding\\')
 minrangeresp = 0.04 
+
+cm = 1/2.54  # centimeters in inches
+plt.rcParams.update({'font.size': 6, 'xtick.labelsize': 7, 'ytick.labelsize': 7, 'axes.titlesize': 8,
+                     'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
 
 #%% Load all GR sessions: 
 sessions,nSessions   = filter_sessions(protocols = 'GR')
@@ -82,6 +86,7 @@ minnneurons             = 10
 maxnoiselevel           = 20
 
 mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
+params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 
 #Correlation output:
 corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
@@ -144,6 +149,14 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         idx_ses = np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_N3])
         mean_resp_split[ialp,:,:,idx_ses] = meanresp[idx_N3]
 
+        regressdata          = np.full((N,3),np.nan)
+        regress_sig          = np.full((N,2),0)
+        for n in range(N):
+            xdata = meanresp[n,:,0]
+            ydata = meanresp[n,:,1]
+            regressdata[n,:] = linregress(xdata,ydata)[:3]
+        params_regress[idx_ses,ialp,:] = regressdata[idx_N3]
+
         tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
         tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
         corrdata_cells[ialp,idx_ses] = tempcorr
@@ -173,7 +186,7 @@ scoring_type        = 'accuracy_score'
 stilltrialsonly     = True
 minnneurons         = 10
 maxnoiselevel       = 20
-nmodelfits          = 25
+nmodelfits          = 10
 
 # model_name          = 'LogisticRegression'
 
@@ -182,25 +195,23 @@ maxvideome              = 0.2
 maxrunspeed             = 5
 
 #%% Baseline decoding: 
-
-#%% Decoding orientation when the FF or FB activity is high or low:
 arealabelpairs          = [
                             'PMunlL2/3',
                             'V1unlL2/3',
                             ]
+# legendlabels            = ['V1','PM']
 legendlabels            = ['PM','V1']
 
 narealabelpairs         = len(arealabelpairs)
 
-# popsizes              = np.array([2,5,10,20,50,100,200,500])
 popsizes                = np.array([2,5,10,20,50,100,200])
 # popsizes              = np.array([5,10])
 npopsizes               = len(popsizes)
 
 error_cv                = np.full((npopsizes,narealabelpairs,nSessions,nmodelfits),np.nan)
 
-# for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions'):
-for ises in tqdm([0,1],total=nSessions,desc='Decoding across sessions'):
+for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions'):
+# for ises in tqdm([0,1,2],total=nSessions,desc='Decoding across sessions'):
     data            = sessions[ises].respmat
     ori_ses         = sessions[ises].trialdata['Orientation']
 
@@ -215,13 +226,11 @@ for ises in tqdm([0,1],total=nSessions,desc='Decoding across sessions'):
         idx_ses         = np.isin(celldata['session_id'],sessions[ises].celldata['session_id'][0])
 
         idx_N           =  np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp,
-                                        #   rangeresp[idx_ses]>minrangeresp,
                                           sessions[ises].celldata['noise_level']<maxnoiselevel,
                                         ),axis=0))[0]
 
         for ipop,popsize in enumerate(popsizes):
             if len(idx_N)>popsize:
-
                 for imf in range(nmodelfits):
                     idx_N_sub = np.random.choice(idx_N,popsize,replace=False)
                     X = data[np.ix_(idx_N_sub,idx_T)].T
@@ -235,26 +244,25 @@ for ises in tqdm([0,1],total=nSessions,desc='Decoding across sessions'):
                 
 #%% Plot decoding performance for different number of V1 and PM neurons
 
-fig,axes = plt.subplots(1,2,figsize=(6,3),sharex=True,sharey=True)
+# fig,axes = plt.subplots(1,2,figsize=(6,3),sharex=True,sharey=True)
+fig,axes = plt.subplots(1,2,figsize=(8*cm,4*cm),sharex=True,sharey=True)
 for ialp,alp in enumerate(arealabelpairs):
-
     ax = axes[ialp]
     ax.scatter(popsizes, np.nanmean(error_cv[:,ialp,:,:],axis=(1,2)), marker='o', color=clrs_arealabelpairs[ialp])
     ax.plot(popsizes,np.nanmean(error_cv[:,ialp,:,:],axis=(2)),color=clrs_arealabelpairs[ialp], linewidth=0.5)
     shaded_error(popsizes,np.nanmean(error_cv[:,ialp,:,:],axis=(2)).T,center='mean',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
     ax.set_ylim([0,1])
-    # ax.set_xlim([0,popsizes[-1]+1])
-    ax.set_xticks(popsizes)
+    # ax.set_xticks(popsizes)
+    ax.set_xticks(popsizes[[1,3,4,5,6]])
     ax.axhline(1/16,linestyle='--',color='k',alpha=0.5)
-    ax.text(popsizes[-1],1/16+0.05,'Chance',fontsize=10,ha='right',va='center')
-
+    ax.text(popsizes[-1],1/16+0.1,'Chance',fontsize=7,ha='right',va='center')
     ax.set_xlabel('Population size')
-    ax.set_ylabel('Decoding Performance')
-    ax.set_title(legendlabels[ialp],fontsize=12)
-
+    if ialp == 0:
+        ax.set_ylabel('Decoding Performance')
+    ax.set_title(legendlabels[ialp],fontsize=9)
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Decoding_Perf_PopSize_V1PM_%dsessions' % nSessions)
+my_savefig(fig,savedir,'Decoding_Perf_PopSize_V1PM_%dsessions' % nSessions)
 
 
 #%% Decoding orientation when the FF or FB activity is high or low:
@@ -267,6 +275,7 @@ narealabelpairs         = len(arealabelpairs)
 perc                = 25
 maxnoiselevel       = 20
 nsampleneurons      = 50
+minnneurons         = 5
 
 error_cv            = np.full((narealabelpairs,2,nSessions,nmodelfits),np.nan)
 
@@ -304,14 +313,10 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
             idx_ses             = np.isin(celldata['session_id'],sessions[ises].celldata['session_id'][0])
             idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
                                         #   np.any(corrsig_cells[:,idx_ses]!=1,axis=0),
-                                        #   rangeresp[idx_ses]>minrangeresp,
+                                          rangeresp[idx_ses]>minrangeresp,
                                           np.any(corrsig_cells[:,idx_ses]==1,axis=0),
                                           sessions[ises].celldata['noise_level']<maxnoiselevel,
                                         ),axis=0))[0]
-            
-            # subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-            # idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-            # idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
 
             if len(idx_N1) < minnneurons or len(idx_N2) < minnneurons or len(idx_N3) < nsampleneurons:
                 continue
@@ -422,44 +427,56 @@ print(res.summary())
 #%% Normalized plot:
 # extreme percentiles: 
 legendlabels            = ['FF','FB']
-xoffset = 1.5
-normalize = True
+xoffset         = 1.5
+normalize       = True
 
 axtitles = np.array(['Feedforward','Feedback']) 
-fig,axes = plt.subplots(1,1,figsize=(3,3))
+fig,axes = plt.subplots(1,1,figsize=(4.5*cm,5*cm))
 ax = axes
 ialp = 0 
 data = np.nanmean(error_cv[ialp,:,:,:],axis=2)
 if normalize:
-    data -= data[0,:][None,:]
+    # data -= data[0,:][None,:]
+    data /= data[0,:][None,:]
 ax.plot(np.tile([0,1],(nSessions,1)).T,data,color='grey',ls='-',linewidth=1)
 ax.errorbar(x=[0,1],y=np.nanmean(data,axis=1),yerr=np.nanstd(data,axis=1)/np.sqrt(nSessions),color='k',ls='None',linewidth=2)
 ax.plot(np.array([0,1]),np.nanmean(data,axis=1),color='black',ls='-',linewidth=2)
+add_paired_ttest_results(ax, data[0,:],data[1,:],pos=[0.25,0.5],fontsize=8)
 
 ialp = 1
 data = np.nanmean(error_cv[ialp,:,:,:],axis=2)
 if normalize:
-    data -= data[0,:][None,:]
+    # data -= data[0,:][None,:]
+    data /= data[0,:][None,:]
+    # ydata = error_cv[ialp,1,:,:] / error_cv[ialp,0,:,:]
+
 ax.plot(np.tile([0,1],(nSessions,1)).T+xoffset,data,color='grey',ls='-',linewidth=1)
 ax.errorbar(x=np.array([0,1])+xoffset,y=np.nanmean(data,axis=1),yerr=np.nanstd(data,axis=1)/np.sqrt(nSessions),
             color='k',ls='None',linewidth=2)
 ax.plot(np.array([0,1])+xoffset,np.nanmean(data,axis=1),color='black',ls='-',linewidth=2)
+add_paired_ttest_results(ax, data[0,:],data[1,:],pos=[0.75,0.5],fontsize=7)
 if not normalize:
     ax.axhline(1/16,linestyle='--',color='k',alpha=0.5)
-    ax.text(0.5,1/16+0.05,'Chance',fontsize=10,ha='center',va='center')
+    ax.text(0.5,1/16+0.05,'Chance',fontsize=8,ha='center',va='center')
     ax.set_ylim([0,1])
 else:
-    ax.set_ylim([-0.05,0.2])
-
-ax.set_ylabel('Decoding Performance')
+    # ax.set_ylim([-0.05,0.2])
+    ax.set_ylim([0.9,1.3])
+ax.set_ylabel('Relative Decoding Performance',fontsize=7)
+ax_nticks(ax,4)
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-ax.set_xticks(np.concatenate((np.arange(2),np.arange(2)+xoffset)),labels=['FF Low','FF High', 'FB Low','FB High'],fontsize=8)
+# ax.set_xticks(np.concatenate((np.arange(2),np.arange(2)+xoffset)),labels=['FF Low','FF High', 'FB Low','FB High'])
+ax.set_xticks(np.concatenate((np.arange(2),np.arange(2)+xoffset)),labels=['Low','High', 'Low','High'],
+        fontsize=6)
+ax.set_xlabel('Activity Level',fontsize=7)
+ax.text(0.25,1.05,'FF',fontsize=9,ha='center',va='center',transform=plt.gca().transAxes,color=clrs_arealabelpairs[0])
+ax.text(0.75,1.05,'FB',fontsize=9,ha='center',va='center',transform=plt.gca().transAxes,color=clrs_arealabelpairs[1])
 
 #Statistics:
 testdata    = np.nanmean(error_cv,axis=3) #average over modelfits
-idx_ses  = ~np.any(np.isnan(testdata),axis=(0,1))
+idx_ses     = ~np.any(np.isnan(testdata),axis=(0,1)) #select only session for which all conditions are present
 df = pd.DataFrame({'perf': testdata.flatten(),
                    'act': np.repeat(np.tile(np.arange(2),2),nSessions),
                    'area': np.repeat(np.arange(2),2*nSessions),
@@ -480,10 +497,9 @@ restable = res.anova_table
 testlabel = ['Activity','Pathway','Interaction']
 for i in range(3):
     ax.text(0.5,0.95-0.07*i,'%s%s: F(%d,%d)=%1.2f, p=%1.3f' % (get_sig_asterisks(restable['Pr > F'][i]),testlabel[i],restable['Num DF'][i],restable['Den DF'][i],restable['F Value'][i],restable['Pr > F'][i])
-            ,transform=plt.gca().transAxes,fontsize=7,ha='center',va='center')
-# 
-# my_savefig(fig,savedir,'Decoding_Minimalistic_Ori_FF_FB_LowHigh_StillOnly_%dsessions' % nSessions)
-# my_savefig(fig,savedir,'Decoding_Ori_FF_FB_LowHigh_StillOnly_Normalized_%dsessions' % nSessions, formats = ['png'])
+            ,transform=plt.gca().transAxes,fontsize=4,ha='center',va='center')
+
+my_savefig(fig,savedir,'Decoding_LowHigh_StillOnly_Normalized_%dsessions' % nSessions)
 
 #%% Relating decoding performance increase to multiplicative gain increases: 
 
@@ -496,19 +512,15 @@ narealabelpairs         = len(arealabelpairs)
 perc                = 25
 maxnoiselevel       = 20
 nsampleneurons      = 10
-nmodelfits          = 20
+nmodelfits          = 50
 
 error_cv            = np.full((narealabelpairs,2,nSessions,nmodelfits),np.nan)
 params_meansub      = np.full((narealabelpairs,2,nSessions,nmodelfits),np.nan)
-# add_fact            = np.full((narealabelpairs,nSessions,nmodelfits),np.nan)
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions'):
-# for ises in tqdm([9,10],total=nSessions,desc='Decoding across sessions'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
 
-    # data            = sessions[ises].respmat_behavout / sessions[ises].celldata['meanF'].to_numpy()[:,None]
     data            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
-    # data            = sessions[ises].respmat
 
     ori_ses         = sessions[ises].trialdata['Orientation']
 
@@ -518,8 +530,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
     else:
         idx_T_still = np.ones(K,dtype=bool)
    
-    # idx_nearby          = filter_nearlabeled(sessions[ises],radius=50)
-
     for ialp,alp in enumerate(arealabelpairs):
         
         for imf in range(nmodelfits):
@@ -546,12 +556,10 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
             idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
 
             if len(idx_N1) < minnneurons or len(idx_N2) < minnneurons or len(idx_N3) < nsampleneurons:
-                # print(f'Not enough neurons in {alp} for session {ises}')
-                # print(f'N1: {len(idx_N1)}, N2: {len(idx_N2)}')
                 continue
 
-            meanpopact          = np.nanmean(data[idx_N1,:],axis=0)
-            # meanpopact          = np.nanmean(data[idx_N1,:],axis=0) - np.nanmean(data[idx_N2,:],axis=0)
+            # meanpopact          = np.nanmean(data[idx_N1,:],axis=0)
+            meanpopact          = np.nanmean(data[idx_N1,:],axis=0) - np.nanmean(data[idx_N2,:],axis=0)
             # meanpopact          = np.nanmean(data[idx_N1,:],axis=0) / np.nanmean(data[idx_N2,:],axis=0)
 
             # compute index for trials with low and high activity in the other labeled pop
@@ -592,34 +600,33 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
             params_regress_ses = params_regress[idx_ses]
             params_meansub[ialp,0,ises,imf] = np.nanmean(params_regress_ses[idx_N_sub,ialp,0])
             params_meansub[ialp,1,ises,imf] = np.nanmean(params_regress_ses[idx_N_sub,ialp,1])
-            # params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 
 #%% Plot increase in decoding performance for different number of V1 and PM neurons
-fig,axes = plt.subplots(1,2,figsize=(6,3),sharex=False,sharey=True)
+# fig,axes = plt.subplots(1,2,figsize=(6,3),sharex=False,sharey=True)
+fig,axes = plt.subplots(1,2,figsize=(8*cm,4*cm),sharex=False,sharey=True)
 
-for iparam,param in enumerate(['Mult','Add']):
+for iparam,param in enumerate(['slope','offset']):
     ax = axes[iparam]
     for ialp,alp in enumerate(arealabelpairs):
         xdata = params_meansub[ialp,iparam,:,:].flatten()
-        # ydata = np.diff(error_cv[:,ialp,:,:],axis=1).flatten()
-        ydata = error_cv[ialp,1,:,:] - error_cv[ialp,0,:,:]
+        ydata = error_cv[ialp,1,:,:] / error_cv[ialp,0,:,:]
         ydata = ydata.flatten()
         # ax.scatter(xdata,ydata, marker='o', color=clrs_arealabelpairs[ialp])
         # ax.scatter(xdata,ydata, marker='.', color=clrs_arealabelpairs[ialp])
         sns.regplot(x=xdata,y=ydata,ax=ax,scatter=True,ci=95,color=clrs_arealabelpairs[ialp],
-                    scatter_kws={'s':8},line_kws={'color':clrs_arealabelpairs[ialp]})
+                    scatter_kws={'s':1},line_kws={'color':clrs_arealabelpairs[ialp]})
     ax.axhline(0,linestyle='--',color='k',alpha=0.5)
-    # ax.plot(popsizes,np.nanmean(error_cv[:,ialp,:,:],axis=(2)),color=clrs_arealabelpairs[ialp], linewidth=0.5)
-    # shaded_error(popsizes,np.nanmean(error_cv[:,ialp,:,:],axis=(2)).T,center='mean',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
 
-    ax.text(0.1,0.9,legendlabels[0],fontsize=12,ha='center',va='center',transform=ax.transAxes,color=clrs_arealabelpairs[0])
-    ax.text(0.3,0.9,legendlabels[1],fontsize=12,ha='center',va='center',transform=ax.transAxes,color=clrs_arealabelpairs[1])
-    ax.set_xlabel('Ensemble mean %s factor' % param)
+    if iparam==0:
+        ax.text(0.8,0.1,legendlabels[0],fontsize=7,ha='center',va='center',transform=ax.transAxes,color=clrs_arealabelpairs[0])
+        ax.text(0.8,0.2,legendlabels[1],fontsize=7,ha='center',va='center',transform=ax.transAxes,color=clrs_arealabelpairs[1])
+    ax.set_xlabel('Ensemble mean %s' % param)
     if iparam == 0: 
-        ax.set_ylabel('Increase Decoding Performance')
-    ax.set_title(param,fontsize=12)
-    # ax.set_title(legendlabels[ialp],fontsize=12)
-
+        ax.set_ylabel('Decoding Performance\n (High / Low)',fontsize=6)
+    ax.set_title(param,fontsize=8)
+    ax_nticks(ax,4)
+    ax.set_ylim([0.5,1.75])
+    ax.axhline(1,ls=':',linewidth=1,color='k')
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'DeltaDecoding_Mult_Add_Ensembles_%dsessions' % nSessions)

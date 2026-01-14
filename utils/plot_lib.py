@@ -328,8 +328,9 @@ def get_clr_areas(areas):
     #                 'PM' : sns.xkcd_rgb['barney'],
     #                 'AL' : sns.xkcd_rgb['clear blue'],
     #                 'RSP' : sns.xkcd_rgb['orangered']}
-    palette       = {'V1'  : '#9933FF',
-                    'PM' : '#00CC99',
+    palette       = {
+                    'V1'  : '#00CC99',
+                    'PM' : '#9933FF',
                     'AL' : sns.xkcd_rgb['clear blue'],
                     'RSP' : sns.xkcd_rgb['orangered']}
     return itemgetter(*areas)(palette)

@@ -30,6 +30,11 @@ sessions,nsessions            = filter_sessions(protocols,min_cells=1)
 # session_list        = np.array([['LPE11086','2024_01_05']])
 # sessions,nsessions  = load_sessions(protocol = 'GR',session_list=session_list)
 
+#%% Set plotting parameters:
+cm = 1/2.54  # centimeters in inches
+plt.rcParams.update({'font.size': 6, 'xtick.labelsize': 7, 'ytick.labelsize': 7, 'axes.titlesize': 8,
+                     'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
+
 #%% #### reset threshold if necessary:
 threshold = 0.5
 for ses in sessions:
@@ -45,6 +50,32 @@ celldata = celldata.drop_duplicates(subset='cell_id', keep="first")
 celldata = pd.concat([ses.celldata for ses in sessions]).reset_index(drop=True)
 
 celldata.loc[celldata['redcell']==0,'recombinase'] = 'non'
+
+#%% Get information about labeled cells per session per area: 
+sesdata = pd.DataFrame()
+sesdata['roi_name']         = celldata.groupby(["session_id","roi_name"])['roi_name'].unique()
+sesdata['recombinase']      = celldata[celldata['recombinase'].isin(['cre','flp'])].groupby(["session_id","roi_name"])['recombinase'].unique()
+sesdata = sesdata.applymap(lambda x: x[0],na_action='ignore')
+sesdata['ncells']           = celldata.groupby(["session_id","roi_name"])['nredcells'].count()
+sesdata['nredcells']        = celldata.groupby(["session_id","roi_name"])['nredcells'].unique().apply(sum)
+sesdata['nlabeled']         = celldata.groupby(["session_id","roi_name"])['redcell'].sum()
+sesdata['frac_responsive']  = sesdata['nlabeled'] / sesdata['nredcells'] 
+sesdata['frac_labeled']     = sesdata['nlabeled'] / sesdata['ncells'] 
+
+#%% ### Get the number of labeled cells, cre / flp, depth, area etc. for each plane :
+planedata = pd.DataFrame()
+planedata['depth']          = celldata.groupby(["session_id","plane_idx"])['depth'].unique()
+planedata['roi_name']       = celldata.groupby(["session_id","plane_idx"])['roi_name'].unique()
+planedata['recombinase']    = celldata[celldata['recombinase'].isin(['cre','flp'])].groupby(["session_id","plane_idx"])['recombinase'].unique()
+planedata = planedata.applymap(lambda x: x[0],na_action='ignore')
+planedata['ncells']         = celldata.groupby(["session_id","plane_idx"])['depth'].count()
+planedata['nlabeled']       = celldata.groupby(["session_id","plane_idx"])['redcell'].sum()
+planedata['frac_labeled']   = celldata.groupby(["session_id","plane_idx"])['redcell'].sum() / celldata.groupby(["session_id","plane_idx"])['redcell'].count()
+planedata['nredcells']      = celldata.groupby(["session_id","plane_idx"])['nredcells'].mean().astype(int)
+planedata['frac_responsive']  = celldata.groupby(["session_id","plane_idx"])['redcell'].sum() / planedata['nredcells'] 
+
+
+#%% 
 
 #%% ####### Show histogram of ROI overlaps: #######################
 fig, (ax1,ax2) = plt.subplots(2,1,figsize=(3.5,3),sharex=True)
@@ -96,22 +127,29 @@ plt.ylabel('frac_of_ROI_red')
 plt.tight_layout()
 # plt.savefig(os.path.join(savedir,'Scatter_Overlap_Twoways_%dcells_%dsessions' % (len(celldata),nsessions) + '.png'), format = 'png')
 
-#%% Get information about labeled cells per session per area: 
-sesdata = pd.DataFrame()
-sesdata['roi_name']         = celldata.groupby(["session_id","roi_name"])['roi_name'].unique()
-sesdata['recombinase']      = celldata[celldata['recombinase'].isin(['cre','flp'])].groupby(["session_id","roi_name"])['recombinase'].unique()
-sesdata = sesdata.applymap(lambda x: x[0],na_action='ignore')
-sesdata['ncells']           = celldata.groupby(["session_id","roi_name"])['nredcells'].count()
-sesdata['nredcells']        = celldata.groupby(["session_id","roi_name"])['nredcells'].unique().apply(sum)
-sesdata['nlabeled']         = celldata.groupby(["session_id","roi_name"])['redcell'].sum()
-sesdata['frac_responsive']  = sesdata['nlabeled'] / sesdata['nredcells'] 
-sesdata['frac_labeled']     = sesdata['nlabeled'] / sesdata['ncells'] 
+
+
 
 #%% 
 areas = ['V1','PM']
 clrs_areas          = get_clr_areas(areas)
 
 
+#%% Scatter plot as a function of depth:
+fig, ax = plt.subplots(figsize=(4*cm,6*cm))
+# sns.scatterplot(data=planedata,x='depth',y='frac_labeled',hue='roi_name',palette=clrs_areas,ax=ax,s=14,hue_order=areas)
+sns.scatterplot(data=planedata,y='depth',x='frac_labeled',hue='roi_name',palette=clrs_areas,ax=ax,s=14,hue_order=areas)
+sns.lineplot(x=planedata['frac_labeled'],y=planedata['depth'].round(-2),
+             hue=planedata['roi_name'],palette=clrs_areas,ax=ax,hue_order=areas,   orient="y")
+ax.set_xlabel('Fraction labeled in plane')
+ax.set_ylabel(r'Cortical depth ($\mu$m)')
+ax.set_ylim([50,500])
+ax.invert_yaxis()
+ax_nticks(ax,5)
+sns.despine(fig=fig, top=True, right=True,offset=3)
+plt.tight_layout()
+plt.legend(ax.get_legend_handles_labels()[0][:4],areas, loc='best',frameon=False)
+my_savefig(fig,savedir,'Frac_labeled_depth_area_%dplanes' % len(planedata))
 
 #%% Bar plot of number of labeled cells per area:
 fig, axes = plt.subplots(1,1,figsize=(2.5,2.5))
@@ -128,10 +166,8 @@ ax_nticks(ax,3)
 sns.despine(fig=fig, top=True, right=True, offset=3,trim=False)
 plt.tight_layout()
 
-my_savefig(fig,savedir,'Labeling_Fraction_%danimals' % nanimals)
+# my_savefig(fig,savedir,'Labeling_Fraction_%danimals' % nanimals)
 # plt.savefig(os.path.join(savedir,'Frac_labeled_area_%dsessions' % len(sesdata) + '.png'), format = 'png',bbox_inches='tight')
-
-
 
 
 #%% Bar plot of number of labeled cells per area:
@@ -184,17 +220,6 @@ plt.xlabel(r'Area')
 plt.tight_layout()
 # plt.savefig(os.path.join(savedir,'nLabeled_area_%dsessions' % len(sesdata) + '.png'), format = 'png',bbox_inches='tight')
 
-#%% ### Get the number of labeled cells, cre / flp, depth, area etc. for each plane :
-planedata = pd.DataFrame()
-planedata['depth']          = celldata.groupby(["session_id","plane_idx"])['depth'].unique()
-planedata['roi_name']       = celldata.groupby(["session_id","plane_idx"])['roi_name'].unique()
-planedata['recombinase']    = celldata[celldata['recombinase'].isin(['cre','flp'])].groupby(["session_id","plane_idx"])['recombinase'].unique()
-planedata = planedata.applymap(lambda x: x[0],na_action='ignore')
-planedata['ncells']         = celldata.groupby(["session_id","plane_idx"])['depth'].count()
-planedata['nlabeled']       = celldata.groupby(["session_id","plane_idx"])['redcell'].sum()
-planedata['frac_labeled']   = celldata.groupby(["session_id","plane_idx"])['redcell'].sum() / celldata.groupby(["session_id","plane_idx"])['redcell'].count()
-planedata['nredcells']      = celldata.groupby(["session_id","plane_idx"])['nredcells'].mean().astype(int)
-planedata['frac_responsive']  = celldata.groupby(["session_id","plane_idx"])['redcell'].sum() / planedata['nredcells'] 
 
 #%% Bar plot of number of labeled cells per area:
 fig, ax = plt.subplots(figsize=(3,2.5))
@@ -203,7 +228,7 @@ sns.stripplot(data=planedata,x='roi_name',y='frac_labeled',color='k',ax=ax,size=
 plt.ylabel('Fraction labeled in plane')
 plt.xlabel(r'Area')
 plt.tight_layout()
-plt.savefig(os.path.join(savedir,'Frac_labeled_area_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
+# plt.savefig(os.path.join(savedir,'Frac_labeled_area_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
 
 #%% Bar plot of difference between cre and flp:
 enzymes = ['cre','flp']
@@ -233,7 +258,7 @@ plt.tight_layout()
 sns.lineplot(x=planedata['depth'].round(-2),y=planedata['frac_labeled'],
              hue=planedata['roi_name'],palette=clrs_areas,ax=ax,hue_order=areas)
 plt.legend(ax.get_legend_handles_labels()[0][:4],areas, loc='best',frameon=False)
-plt.savefig(os.path.join(savedir,'Frac_labeled_depth_area_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
+# plt.savefig(os.path.join(savedir,'Frac_labeled_depth_area_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
 
 #%% Number of labeled cells as a function of depth:
 fig, ax = plt.subplots(figsize=(5,4))
