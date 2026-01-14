@@ -15,7 +15,6 @@ from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
 
 # os.chdir('e:\\Python\\molanalysis')
-# os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
 os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.get_data_folder import get_local_drive

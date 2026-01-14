@@ -50,17 +50,6 @@ sessions = compute_tuning_wrapper(sessions)
 #%% Concatenate celldata across sessions:
 celldata = pd.concat([ses.celldata for ses in sessions]).reset_index(drop=True)
 
-n_example_cells = 10
-example_cells = np.random.choice(np.where(
-    sessions[0].celldata['tuning_var'] > np.percentile(sessions[0].celldata['tuning_var'],90))[0],n_example_cells,replace=False)
-    # sessions[0].celldata['gOSI'] > np.percentile(sessions[0].celldata['gOSI'],90))[0],n_example_cells)
-
-#%% Show some tuned responses with calcium and deconvolved traces across orientations:
-fig = plot_tuned_response(sessions[0].tensor,sessions[0].trialdata,t_axis,example_cells,plot_n_trials=10)
-fig.suptitle('%s - dF/F' % sessions[0].session_id,fontsize=12)
-# save the figure
-# fig.savefig(os.path.join(savedir,'TunedResponse_dF_%s.png' % sessions[0].session_id))
-
 #%%
 example_cells   = np.array([],dtype=int)
 n_example_cells = 12
@@ -77,3 +66,13 @@ for arealabel in ['V1unl','V1lab','PMunl','PMlab']:
 fig = plot_excerpt(sessions[0],trialsel=trialsel,neural_version='traces',neuronsel=example_cells,
                    plot_behavioral=False)
 my_savefig(fig,savedir,'Excerpt_GR_%s' % (sessions[0].session_id))
+
+#%%
+n_example_cells = 10
+example_cells = np.random.choice(np.where(
+    sessions[0].celldata['tuning_var'] > np.percentile(sessions[0].celldata['tuning_var'],90))[0],n_example_cells,replace=False)
+fig = plot_tuned_response(sessions[0].tensor,sessions[0].trialdata,t_axis,example_cells,plot_n_trials=10)
+fig.suptitle('%s - dF/F' % sessions[0].session_id,fontsize=12)
+# save the figure
+# fig.savefig(os.path.join(savedir,'TunedResponse_dF_%s.png' % sessions[0].session_id))
+

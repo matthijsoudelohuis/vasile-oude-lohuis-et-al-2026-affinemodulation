@@ -16,7 +16,8 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from statsmodels.stats.anova import AnovaRM
 
 # os.chdir('e:\\Python\\molanalysis')
-os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
+# os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
+os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.session_info import *
 from loaddata.get_data_folder import get_local_drive
@@ -28,6 +29,7 @@ from utils.RRRlib import regress_out_behavior_modulation
 from utils.regress_lib import *
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\Decoding\\')
+minrangeresp = 0.04 
 
 #%% Load all GR sessions: 
 sessions,nSessions   = filter_sessions(protocols = 'GR')
@@ -35,8 +37,7 @@ sessions,nSessions   = filter_sessions(protocols = 'GR')
 #%%  Load data properly:
 calciumversion = 'deconv'
 for ises in range(nSessions):
-    sessions[ises].load_respmat(load_behaviordata=True, load_calciumdata=True,load_videodata=True,
-                                calciumversion=calciumversion,keepraw=False)
+    sessions[ises].load_respmat(calciumversion=calciumversion)
 
 #%%
 sessions = compute_tuning_wrapper(sessions)
@@ -52,126 +53,7 @@ for ises in range(nSessions):
     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
     sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
-
     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
-
-#%%
-celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
-
-#%% For every session remove behavior related variability:
-# rank_behavout = 3
-# # maxnoiselevel = 20
-
-# #%%
-# for ises in range(nSessions):
-
-#     # Convert response_matrix and orientations_vector to numpy arrays
-#     # response_matrix         = np.array(response_matrix)
-#     conditions_vector       = np.array(sessions[ises].trialdata['stimCond'])
-#     conditions              = np.sort(np.unique(conditions_vector))
-#     C                       = len(conditions)
-
-#     resp_mean       = sessions[ises].respmat.copy()
-#     # resp_res        = sessions[ises].respmat.copy()
-
-#     for iC,cond in enumerate(conditions):
-#         tempmean                            = np.nanmean(sessions[ises].respmat[:,conditions_vector==cond],axis=1)
-#         # resp_mean[:,iC]                     = tempmean
-#         resp_mean[:,conditions_vector==cond] = tempmean[:,np.newaxis]
-
-#     Y               = sessions[ises].respmat.copy()
-#     Y               = Y - resp_mean
-#     [Y_orig,Y_hat,Y_out,rank,ev] = regress_out_behavior_modulation(sessions[ises],X=None,Y=Y.T,
-#                                 nvideoPCs = 30,rank=rank_behavout,lam=0,perCond=True,kfold = 5)
-#     # print(ev)
-#     sessions[ises].respmat_behavout = Y_out.T + resp_mean
-
-# plt.imshow(sessions[ises].respmat,cmap='RdBu_r',vmin=0,vmax=100)
-# plt.imshow(sessions[ises].respmat_behavout,cmap='RdBu_r',vmin=0,vmax=100)
-
-#%% Show tuning curve when activityin the other area is low or high (only still trials)
-arealabelpairs  = [
-                    'V1lab-V1unl-PMunlL2/3',
-                    'PMlab-PMunl-V1unlL2/3',
-                    ]
-
-narealabelpairs         = len(arealabelpairs)
-
-celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
-
-nOris                   = 16
-nCells                  = len(celldata)
-oris                    = np.sort(sessions[0].trialdata['Orientation'].unique())
-perc                    = 25
-
-#criteria for selecting still trials:
-maxvideome              = 0.2
-maxrunspeed             = 5
-alphathr                = 0.001 #threshold for correlation with cross area rate
-
-minnneurons             = 10
-maxnoiselevel           = 20
-mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
-error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
-
-for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
-    [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
-
-    respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
-
-    idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed)
-    
-    for ialp,alp in enumerate(arealabelpairs):
-        idx_N1              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
-        
-        idx_N2              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
-
-        idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
-                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
-
-        subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-        idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-        idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
-
-        if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
-            continue
-        
-        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
-        # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
-
-        # compute meanresp for trials with low and high difference in lab-unl activation
-        meanresp            = np.empty([N,len(oris),2])
-        ori_ses             = sessions[ises].trialdata['Orientation']
-        oris                = np.unique(ori_ses)
-        for i,ori in enumerate(oris):
-            # idx_T               = ori_ses == ori
-            idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
-
-            idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],perc)
-            idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-perc)
-            meanresp[:,i,0]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1)
-            meanresp[:,i,1]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1)
-
-        idx_ses = np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_N3])
-        mean_resp_split[ialp,:,:,idx_ses] = meanresp[idx_N3]
-
-# Fit gain coefficient for each neuron and compare labeled and unlabeled neurons:
-N = len(celldata)
-data_gainregress = np.full((N,narealabelpairs,3),np.nan)
-for iN in tqdm(range(N),total=N,desc='Fitting gain for each neuron'):
-    for ialp,alp in enumerate(arealabelpairs):
-        xdata = mean_resp_split[ialp,:,0,iN]
-        ydata = mean_resp_split[ialp,:,1,iN]
-        data_gainregress[iN,ialp,:] = linregress(xdata,ydata)[:3]
-
 
 #%% Show tuning curve when activity in the other area is low or high (only still trials)
 arealabelpairs  = [
@@ -179,6 +61,9 @@ arealabelpairs  = [
                     'PMlab-PMunl-V1unlL2/3',
                     ]
 
+clrs_arealabelpairs         = get_clr_arealabelpairs(arealabelpairs)
+clrs_arealabels_low_high    = get_clr_area_low_high()  # PMlab-PMunl-V1unl
+
 narealabelpairs         = len(arealabelpairs)
 
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
@@ -195,14 +80,8 @@ alphathr                = 0.001 #threshold for correlation with cross area rate
 
 minnneurons             = 10
 maxnoiselevel           = 20
-mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
-error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
-mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
-#Regression output:
-nboots                  = 0
-params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
-sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
+mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Correlation output:
 corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
@@ -220,29 +99,28 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         idx_N1              = np.where(np.all((
                                     sessions[ises].celldata['arealabel'] == alp.split('-')[0],
                                     sessions[ises].celldata['noise_level']<maxnoiselevel,
+                                    # sessions[ises].celldata['nearby']
                                       ),axis=0))[0]
         
         idx_N2              = np.where(np.all((
                                     sessions[ises].celldata['arealabel'] == alp.split('-')[1],
                                     sessions[ises].celldata['noise_level']<maxnoiselevel,
+                                    # sessions[ises].celldata['nearby']
                                       ),axis=0))[0]
 
         idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
                                       sessions[ises].celldata['noise_level']<maxnoiselevel,
                                       ),axis=0))[0]
 
-        subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-        idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-        idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
-
         if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
             continue
         
-        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
+        #Just mean activity:
+        # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
         #Ratio:
         # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) / np.nanmean(respdata[idx_N2,:],axis=0)
         #Difference:
-        # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
+        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
         # meanpopact          = np.nanmean(respdata[idx_N2,:],axis=0) - np.nanmean(respdata[idx_N1,:],axis=0)
 
         # compute meanresp for trials with low and high difference in lab-unl activation
@@ -265,52 +143,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         idx_ses = np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_N3])
         mean_resp_split[ialp,:,:,idx_ses] = meanresp[idx_N3]
-        error_resp_split[ialp,:,:,idx_ses] = errorresp[idx_N3]
-
-        regressdata          = np.full((N,3),np.nan)
-        regress_sig          = np.full((N,2),0)
-        for n in range(N):
-            xdata = meanresp[n,:,0]
-            ydata = meanresp[n,:,1]
-            regressdata[n,:] = linregress(xdata,ydata)[:3]
-        params_regress[idx_ses,ialp,:] = regressdata[idx_N3]
-
-        if nboots:
-            bootregressdata  = np.full((N,nboots,3),np.nan)
-            bootregress_sig  = np.full((N,2),0)
-            for iboot in range(nboots):
-                meanrespboot            = np.empty([N,len(oris),2])
-                for i,ori in enumerate(oris):
-                    idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
-                    idx_K1              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
-                    idx_K2              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
-                    meanrespboot[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
-                    meanrespboot[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
-                for n in range(N):
-                    bootregressdata[n,iboot,:] = linregress(meanrespboot[n,:,0],meanrespboot[n,:,1])[:3]
-
-            bootregress_sig[regressdata[:,0]>np.percentile(bootregressdata[:,:,0],97.5,axis=1),0] = 1
-            bootregress_sig[regressdata[:,0]<np.percentile(bootregressdata[:,:,0],2.5,axis=1),0] = -1
-            bootregress_sig[regressdata[:,1]>np.percentile(bootregressdata[:,:,1],97.5,axis=1),1] = 1
-            bootregress_sig[regressdata[:,1]<np.percentile(bootregressdata[:,:,1],2.5,axis=1),1] = -1
-
-            sig_params_regress[idx_ses,ialp,:] = bootregress_sig[idx_N3]
-
-        #Aligned:
-        prefori                     = np.argmax(np.mean(meanresp,axis=2),axis=1)
-        # prefori                     = np.argmax(meanresp[:,:,0],axis=1)
-
-        meanresp_pref          = meanresp.copy()
-        for n in range(N):
-            meanresp_pref[n,:,0] = np.roll(meanresp[n,:,0],-prefori[n])
-            meanresp_pref[n,:,1] = np.roll(meanresp[n,:,1],-prefori[n])
-
-        # normalize by peak response
-        tempmin,tempmax = meanresp_pref[:,:,0].min(axis=1,keepdims=True),meanresp_pref[:,:,0].max(axis=1,keepdims=True)
-        meanresp_pref[:,:,0] = (meanresp_pref[:,:,0] - tempmin) / (tempmax - tempmin)
-        meanresp_pref[:,:,1] = (meanresp_pref[:,:,1] - tempmin) / (tempmax - tempmin)
-
-        mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
         tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
         tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
@@ -318,8 +150,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         tempsig = (tempsig<alphathr) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
 
-
-#%% Compute same metric as Flora:
+# Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
@@ -357,7 +188,6 @@ arealabelpairs          = [
                             'PMunlL2/3',
                             'V1unlL2/3',
                             ]
-clrs_arealabelpairs     = ['purple','green']
 legendlabels            = ['PM','V1']
 
 narealabelpairs         = len(arealabelpairs)
@@ -385,7 +215,7 @@ for ises in tqdm([0,1],total=nSessions,desc='Decoding across sessions'):
         idx_ses         = np.isin(celldata['session_id'],sessions[ises].celldata['session_id'][0])
 
         idx_N           =  np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp,
-                                        #   rangeresp[idx_ses]>.04,
+                                        #   rangeresp[idx_ses]>minrangeresp,
                                           sessions[ises].celldata['noise_level']<maxnoiselevel,
                                         ),axis=0))[0]
 
@@ -474,25 +304,16 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
             idx_ses             = np.isin(celldata['session_id'],sessions[ises].celldata['session_id'][0])
             idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
                                         #   np.any(corrsig_cells[:,idx_ses]!=1,axis=0),
-                                          rangeresp[idx_ses]>.04,
-                                        #   np.any(corrsig_cells[:,idx_ses]==1,axis=0),
+                                        #   rangeresp[idx_ses]>minrangeresp,
+                                          np.any(corrsig_cells[:,idx_ses]==1,axis=0),
                                           sessions[ises].celldata['noise_level']<maxnoiselevel,
-
-                                        #   sig_params_regress[idx_ses,ialp,0]==-1,
-                                        #   sig_params_regress[idx_ses,ialp,0]!=0,
-                                        #   sig_params_regress[idx_ses,ialp,0]!=1,
-                                        #   sig_params_regress[idx_ses,ialp,1]==1,
-                                        #   sig_params_regress[idx_ses,ialp,0]==1,
-                                        #   sig_params_regress[idx_ses,ialp,1]!=1,
                                         ),axis=0))[0]
-
-            subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-            idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-            idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
+            
+            # subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
+            # idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
+            # idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
 
             if len(idx_N1) < minnneurons or len(idx_N2) < minnneurons or len(idx_N3) < nsampleneurons:
-                # print(f'Not enough neurons in {alp} for session {ises}')
-                # print(f'N1: {len(idx_N1)}, N2: {len(idx_N2)}')
                 continue
 
             if lam is None:
@@ -505,8 +326,8 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
                 X,y,_ = prep_Xpredictor(X,y) #zscore, set columns with all nans to 0, set nans to 0
                 lam = find_optimal_lambda(X,y,model_name=model_name,kfold=kfold)
 
-            meanpopact          = np.nanmean(data[idx_N1,:],axis=0)
-            # meanpopact          = np.nanmean(data[idx_N1,:],axis=0) - np.nanmean(data[idx_N2,:],axis=0)
+            # meanpopact          = np.nanmean(data[idx_N1,:],axis=0)
+            meanpopact          = np.nanmean(data[idx_N1,:],axis=0) - np.nanmean(data[idx_N2,:],axis=0)
             # meanpopact          = np.nanmean(data[idx_N1,:],axis=0) / np.nanmean(data[idx_N2,:],axis=0)
 
             # compute index for trials with low and high activity in the other labeled pop
@@ -545,7 +366,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
                                                                 lam=lam,norm_out=False,subtract_shuffle=False)
 
 #%% Decoding performance increase with increased FF or FB activity:  
-clrs_arealabelpairs     = ['green','purple']
 legendlabels            = ['FF','FB']
 
 palettes = [['#00E028',[0,1,0]],[[0,1,0],[0,1,0]]]
@@ -601,7 +421,6 @@ print(res.summary())
 
 #%% Normalized plot:
 # extreme percentiles: 
-clrs_arealabelpairs     = ['green','purple']
 legendlabels            = ['FF','FB']
 xoffset = 1.5
 normalize = True
@@ -660,10 +479,10 @@ print(res.summary())
 restable = res.anova_table
 testlabel = ['Activity','Pathway','Interaction']
 for i in range(3):
-    ax.text(0.5,0.95-0.07*i,'%s%s: F(%d,%d)=%1.2f, p=%1.2e' % (get_sig_asterisks(restable['Pr > F'][i]),testlabel[i],restable['Num DF'][i],restable['Den DF'][i],restable['F Value'][i],restable['Pr > F'][i])
+    ax.text(0.5,0.95-0.07*i,'%s%s: F(%d,%d)=%1.2f, p=%1.3f' % (get_sig_asterisks(restable['Pr > F'][i]),testlabel[i],restable['Num DF'][i],restable['Den DF'][i],restable['F Value'][i],restable['Pr > F'][i])
             ,transform=plt.gca().transAxes,fontsize=7,ha='center',va='center')
 # 
-my_savefig(fig,savedir,'Decoding_Minimalistic_Ori_FF_FB_LowHigh_StillOnly_%dsessions' % nSessions)
+# my_savefig(fig,savedir,'Decoding_Minimalistic_Ori_FF_FB_LowHigh_StillOnly_%dsessions' % nSessions)
 # my_savefig(fig,savedir,'Decoding_Ori_FF_FB_LowHigh_StillOnly_Normalized_%dsessions' % nSessions, formats = ['png'])
 
 #%% Relating decoding performance increase to multiplicative gain increases: 
@@ -717,7 +536,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Decoding across sessions
             idx_ses             = np.isin(celldata['session_id'],sessions[ises].celldata['session_id'][0])
             idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
                                         #   np.any(corrsig_cells[:,idx_ses]!=1,axis=0),
-                                          rangeresp[idx_ses]>.04,
+                                          rangeresp[idx_ses]>minrangeresp,
                                         #   np.any(corrsig_cells[:,idx_ses]==1,axis=0),
                                           sessions[ises].celldata['noise_level']<maxnoiselevel,
                                         ),axis=0))[0]
@@ -804,4 +623,38 @@ for iparam,param in enumerate(['Mult','Add']):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'DeltaDecoding_Mult_Add_Ensembles_%dsessions' % nSessions)
+
+#%%
+
+
+#%% For every session remove behavior related variability:
+# rank_behavout = 3
+# # maxnoiselevel = 20
+
+# #%%
+# for ises in range(nSessions):
+
+#     # Convert response_matrix and orientations_vector to numpy arrays
+#     # response_matrix         = np.array(response_matrix)
+#     conditions_vector       = np.array(sessions[ises].trialdata['stimCond'])
+#     conditions              = np.sort(np.unique(conditions_vector))
+#     C                       = len(conditions)
+
+#     resp_mean       = sessions[ises].respmat.copy()
+#     # resp_res        = sessions[ises].respmat.copy()
+
+#     for iC,cond in enumerate(conditions):
+#         tempmean                            = np.nanmean(sessions[ises].respmat[:,conditions_vector==cond],axis=1)
+#         # resp_mean[:,iC]                     = tempmean
+#         resp_mean[:,conditions_vector==cond] = tempmean[:,np.newaxis]
+
+#     Y               = sessions[ises].respmat.copy()
+#     Y               = Y - resp_mean
+#     [Y_orig,Y_hat,Y_out,rank,ev] = regress_out_behavior_modulation(sessions[ises],X=None,Y=Y.T,
+#                                 nvideoPCs = 30,rank=rank_behavout,lam=0,perCond=True,kfold = 5)
+#     # print(ev)
+#     sessions[ises].respmat_behavout = Y_out.T + resp_mean
+
+# plt.imshow(sessions[ises].respmat,cmap='RdBu_r',vmin=0,vmax=100)
+# plt.imshow(sessions[ises].respmat_behavout,cmap='RdBu_r',vmin=0,vmax=100)
 
