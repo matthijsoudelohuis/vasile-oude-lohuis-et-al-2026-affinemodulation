@@ -1410,8 +1410,8 @@ for imodel,model in enumerate([1,2]): #Mult and Add
     # for ipred in range(nPredictors):
     ax = axes[imodel]
     idx_N = np.all((
-            celldata['gOSI']>0.2,
-            # rangeresp > minrangeresp,
+            # celldata['gOSI']>0.2,
+            rangeresp > minrangeresp,
             # celldata['nearby'],
                 ),axis=0)
     ymean = np.nanmean(cvR2_preds[:,model,ipred,idx_N],axis=1)
