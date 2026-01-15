@@ -11,18 +11,15 @@ Matthijs Oude Lohuis, 2023, Champalimaud Center
 import os
 import numpy as np
 import pandas as pd
+import scipy
+from sklearn.preprocessing import minmax_scale
+
 from loaddata.get_data_folder import get_data_folder
 from utils.psth import *
-import scipy
-import logging
-# from utils.filter_lib import my_highpass_filter
-logger = logging.getLogger(__name__)
 
 class Session():
 
     def __init__(self, protocol='', animal_id='', sessiondate='', verbose=1):
-        logger.debug(
-            'Initializing Session object for: \n- animal ID: {}' '\n- Session ID: {}\n'.format(animal_id, sessiondate))
         self.data_folder = os.path.join(
             get_data_folder(), protocol, animal_id, sessiondate)
         self.verbose = verbose
@@ -62,10 +59,6 @@ class Session():
                 assert np.shape(IMrfdata)[0]==np.shape(self.celldata)[0], 'dimensions of IMrfdata and celldata do not match for sessions {}'.format(self.session_id)
                 self.celldata = self.celldata.join(IMrfdata,lsuffix='_old')
             
-            # get only good cells (selected ROIs by suite2p): #not used anymore, only good cells are saved anyways
-            # goodcells               = self.celldata['iscell'] == 1
-            # self.celldata           = self.celldata[goodcells].reset_index(drop=True)
-        
             if self.cellfilter is not None:
                 if isinstance(self.cellfilter, pd.DataFrame):
                     self.cellfilter = self.cellfilter.to_numpy().squeeze()
@@ -73,6 +66,10 @@ class Session():
                 assert np.array_equal(self.cellfilter, self.cellfilter.astype(bool)), 'Cell filter not boolean'
                 self.celldata = self.celldata.iloc[self.cellfilter,:]
                 self.celldata.reset_index(drop=True, inplace=True)
+
+            self.celldata = self.assign_layer2(splitdepth=275)
+            self.celldata['arealayerlabel'] = self.celldata['arealabel'] + self.celldata['layer'] 
+            self.celldata['arealayer'] = self.celldata['roi_name'] + self.celldata['layer'] 
 
         if load_behaviordata:
             self.behaviordata  = pd.read_csv(self.behaviordata_path, sep=',', index_col=0)
@@ -119,23 +116,6 @@ class Session():
         # if load_videodata and load_behaviordata:
         #     self.load_videodata['zpos'] = np.interp(x=self.videodata['ts'],xp=self.behaviordata['ts'],
         #                             fp=self.behaviordata['zpos'])
-
-    def reset_label_threshold(self, threshold):
-        logger.info(
-            'Setting new labeling threshold based on %1.2f overlap' % threshold)
-        # self.celldata['redcell'] = self.celldata['redcell_prob']>0.4
-        self.celldata['redcell'] = self.celldata['frac_red_in_ROI'] >= threshold
-        # print('Need to set cre non flp again\n')
-        logger.info('put lower and upper threshold')
-
-        # Add recombinase enzym label to red cells:
-        labelareas = ['V1', 'PM']
-        for area in labelareas:
-            temprecombinase = area + '_recombinase'
-            self.celldata.loc[self.celldata['roi_name'] == area,
-                              'recombinase'] = self.sessiondata[temprecombinase].to_list()[0]
-        # set all nonlabeled cells to 'non'
-        self.celldata.loc[self.celldata['redcell'] == 0, 'recombinase'] = 'non'
 
     def load_respmat(self, load_behaviordata=True, load_calciumdata=True, load_videodata=True, calciumversion='dF',
                     keepraw=False, cellfilter=None,filter_hp=None):
@@ -184,7 +164,8 @@ class Session():
         self.respmat_videome = compute_respmat(self.videodata['motionenergy'],
                                         self.videodata['ts'],self.trialdata['tOnset'],
                                         t_resp_start=t_resp_start,t_resp_stop=t_resp_stop,method='mean', label = "motion energy")
-        
+        self.respmat_videome = minmax_scale(self.respmat_videome)
+
         self.respmat_videopc = compute_respmat(self.videodata['motionenergy'],
                                         self.videodata['ts'],self.trialdata['tOnset'],
                                         t_resp_start=t_resp_start,t_resp_stop=t_resp_stop,method='mean', label = "motion energy")
@@ -241,7 +222,7 @@ class Session():
             t_pre = -1
             t_post = 2
         else:
-            print('skipping tensory calculation for unknown protocol')
+            print('skipping tensor calculation for unknown protocol')
             return
 
         ##############################################################################
@@ -295,6 +276,104 @@ class Session():
             delattr(self, 'videodata')
             delattr(self, 'behaviordata')
 
+    def reset_label_threshold(self, threshold):
+        self.celldata['redcell'] = self.celldata['frac_red_in_ROI'] >= threshold
+
+        # Add recombinase enzym label to red cells:
+        labelareas = ['V1', 'PM']
+        for area in labelareas:
+            temprecombinase = area + '_recombinase'
+            self.celldata.loc[self.celldata['roi_name'] == area,
+                              'recombinase'] = self.sessiondata[temprecombinase].to_list()[0]
+        # set all nonlabeled cells to 'non'
+        self.celldata.loc[self.celldata['redcell'] == 0, 'recombinase'] = 'non'
+        # create combined label with area and redcell label
+        redcelllabels                   = np.array(['unl','lab']) #Give redcells a string label
+        self.celldata['labeled']        = self.celldata['redcell'].astype(int).apply(lambda x: redcelllabels[x])
+        self.celldata['arealabel']      = self.celldata['roi_name'] + self.celldata['labeled']
+        self.celldata['arealayerlabel'] = self.celldata['arealabel'] + self.celldata['layer'] 
+        self.celldata['arealayer']      = self.celldata['roi_name'] + self.celldata['layer'] 
+
+
+    def assign_layer(self):
+        self.celldata['layer'] = ''
+
+        layers = {
+                'V1': {
+                    'L2/3': (0, 200),
+                    'L4': (200, 275),
+                    'L5': (275, np.inf)
+                },
+                'PM': {
+                'L2/3': (0, 200),
+                'L4': (200, 275),
+                'L5': (275, np.inf)
+            },
+            'AL': {
+                'L2/3': (0, 200),
+                'L4': (200, 275),
+                'L5': (275, np.inf)
+            },
+            'RSP': {
+                'L2/3': (0, 300),
+                'L5': (300, np.inf)
+            }
+        }
+
+        for roi, layerdict in layers.items():
+            for layer, (mindepth, maxdepth) in layerdict.items():
+                idx = self.celldata[(self.celldata['roi_name'] == roi) & (mindepth <= self.celldata['depth']) & (self.celldata['depth'] < maxdepth)].index
+                self.celldata.loc[idx, 'layer'] = layer
+
+        assert(self.celldata['layer'].notnull().all()), 'problematic assignment of layer based on ROI and depth'
+
+        #References: 
+        # V1: 
+        # Niell & Stryker, 2008 Journal of Neuroscience
+        # Gilman, et al. 2017 eNeuro
+        # RSC/PM:
+        # Zilles 1995 Rat cortex areal and laminar structure
+
+        return self.celldata
+
+    def assign_layer2(self, splitdepth=275):
+        self.celldata['layer'] = ''
+
+        layers = {
+            'V1': {
+                'L2/3': (0, splitdepth),
+                'L5': (splitdepth, np.inf)
+            },
+            'PM': {
+                'L2/3': (0, splitdepth),
+                'L5': (splitdepth, np.inf)
+            },
+            'AL': {
+                'L2/3': (0, splitdepth),
+                'L5': (splitdepth, np.inf)
+            },
+            'RSP': {
+                'L2/3': (0, splitdepth),
+                'L5': (splitdepth, np.inf)
+            }
+        }
+
+        for roi, layerdict in layers.items():
+            for layer, (mindepth, maxdepth) in layerdict.items():
+                idx = self.celldata[(self.celldata['roi_name'] == roi) & (mindepth <= self.celldata['depth']) & (self.celldata['depth'] < maxdepth)].index
+                self.celldata.loc[idx, 'layer'] = layer
+
+        assert(self.celldata['layer'].notnull().all()), 'problematic assignment of layer based on ROI and depth'
+
+        #References: 
+        # V1: 
+        # Niell & Stryker, 2008 Journal of Neuroscience
+        # Gilman, et al. 2017 eNeuro
+        # RSC/PM:
+        # Zilles 1995 Rat cortex areal and laminar structure
+
+        return self.celldata
+    
     # Throw respmat_pupilarea through a lowpass filter to create respmat_pupilareaderiv:
     def lowpass_filter(self, respmat, sampling_rate, lowcut=0.1, highcut=0.5, order=10):
         b, a = self._make_butterworth_window(

@@ -10,28 +10,25 @@ from sklearn.preprocessing import minmax_scale
 from sklearn.metrics import r2_score
 from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr
 from scipy import stats
-import statsmodels.formula.api as smf
-from statsmodels.stats.anova import anova_lm
-from statsmodels.formula.api import ols
 
 # os.chdir('e:\\Python\\molanalysis')
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
+from params import load_params
 from loaddata.get_data_folder import get_local_drive
 from loaddata.session_info import filter_sessions,load_sessions
 from utils.tuning import compute_tuning_wrapper
 from utils.gain_lib import * 
 from utils.pair_lib import compute_pairwise_anatomical_distance,value_matching,filter_nearlabeled
 from utils.plot_lib import * #get all the fixed color schemes
-from loaddata.session_info import assign_layer,assign_layer2
-from utils.RRRlib import regress_out_behavior_modulation
+# from loaddata.session_info import assign_layer,assign_layer2
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\SplitTrials\\')
 
-cm = 1/2.54  # centimeters in inches
-plt.rcParams.update({'font.size': 6, 'xtick.labelsize': 6, 'ytick.labelsize': 6, 'axes.titlesize': 8,
-                     'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
-
+#%% Plotting and parameters:
+params  = load_params()
+set_plot_basic_config()
+cm      = 1/2.54  # centimeters in inches
 
 #%% 
 arealabelpairs  = [
@@ -41,38 +38,37 @@ arealabelpairs  = [
 
 clrs_arealabelpairs         = get_clr_arealabelpairs(arealabelpairs)
 clrs_arealabels_low_high    = get_clr_area_low_high()  # PMlab-PMunl-V1unl
-minrangeresp                = 0.04
+# minrangeresp                = params['minrangeresp']
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
 session_list            = np.array([['LPE12223_2024_06_10']])
 session_list            = np.array([['LPE11086_2024_01_05','LPE12223_2024_06_10']])
 
-sessions,nSessions      = filter_sessions(protocols = ['GR'],only_session_id=session_list)
+sessions,nSessions      = filter_sessions(protocols = ['GR'],only_session_id=session_list,filter_noiselevel=True)
 sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 
 #%% Load all GR sessions: 
-sessions,nSessions   = filter_sessions(protocols = 'GR')
+sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
 
 #%%  Load data properly:
-calciumversion = 'deconv'
 for ises in range(nSessions):
-    sessions[ises].load_respmat(calciumversion=calciumversion)
+    sessions[ises].load_respmat(calciumversion=params['calciumversion'])
 
 #%% Compute Tuning Metrics (gOSI, gDSI etc.)
 sessions = compute_tuning_wrapper(sessions)
 
 #%%
 for ises in range(nSessions):   
-    sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=50)
+    sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'])
 
 #%%  #assign arealayerlabel
-for ises in range(nSessions):   
-    # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
-    sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
-    sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
+# for ises in range(nSessions):   
+#     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
+#     sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
+#     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
 
-    sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
+#     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
 
 # #%% 
 # arealayers = np.array(['V1L2/3','PML2/3','PML5'])
@@ -95,37 +91,6 @@ for ises in range(nSessions):
 #     ax.set_title(al)
 # sns.despine(fig=fig, top=True, right=True,offset=0)
 
-
-#%% For every session remove behavior related variability:
-rank_behavout = 3
-# maxnoiselevel = 20
-
-#%%
-for ises in range(nSessions):
-    # Convert response_matrix and orientations_vector to numpy arrays
-    # response_matrix         = np.array(response_matrix)
-    conditions_vector       = np.array(sessions[ises].trialdata['stimCond'])
-    conditions              = np.sort(np.unique(conditions_vector))
-    C                       = len(conditions)
-
-    resp_mean       = sessions[ises].respmat.copy()
-    # resp_res        = sessions[ises].respmat.copy()
-
-    for iC,cond in enumerate(conditions):
-        tempmean                            = np.nanmean(sessions[ises].respmat[:,conditions_vector==cond],axis=1)
-        # resp_mean[:,iC]                     = tempmean
-        resp_mean[:,conditions_vector==cond] = tempmean[:,np.newaxis]
-
-    Y               = sessions[ises].respmat.copy()
-    Y               = Y - resp_mean
-    [Y_orig,Y_hat,Y_out,rank,ev] = regress_out_behavior_modulation(sessions[ises],X=None,Y=Y.T,
-                                nvideoPCs = 30,rank=rank_behavout,lam=0,perCond=True,kfold = 5)
-    # print(ev)
-    sessions[ises].respmat_behavout = Y_out.T + resp_mean
-
-# plt.imshow(sessions[ises].respmat,cmap='RdBu_r',vmin=0,vmax=100)
-# plt.imshow(sessions[ises].respmat_behavout,cmap='RdBu_r',vmin=0,vmax=100)
-
 # %%
  #####  ####### ### #       #          ####### ######  ###    #    #        #####  
 #     #    #     #  #       #             #    #     #  #    # #   #       #     # 
@@ -139,20 +104,20 @@ for ises in range(nSessions):
 # respmat_videoME = []
 # for ises in range(nSessions):   
 #     respmat_videoME.append(list(sessions[ises].respmat_videome))
-maxvideome              = 0.2
-maxrunspeed             = 0.5
-maxnoiselevel           = 20
+# maxvideome              = 0.2
+# maxrunspeed             = 0.5
 
 respmat_videoME = np.array([])
 respmat_runspeed = np.array([])
 for ises in range(nSessions):
-    ses_videoME = sessions[ises].respmat_videome - np.nanpercentile(sessions[ises].respmat_videome,0)
-    ses_videoME = ses_videoME/np.nanpercentile(ses_videoME,100)
-    respmat_videoME = np.append(respmat_videoME,ses_videoME)
+    # ses_videoME = sessions[ises].respmat_videome - np.nanpercentile(sessions[ises].respmat_videome,0)
+    # ses_videoME = ses_videoME/np.nanpercentile(ses_videoME,100)
+    # respmat_videoME = np.append(respmat_videoME,ses_videoME)
+    respmat_videoME = np.append(respmat_videoME,sessions[ises].respmat_videome)
     respmat_runspeed = np.append(respmat_runspeed,sessions[ises].respmat_runspeed)
 
-idx_T_still = np.logical_and(respmat_videoME < maxvideome,
-                            respmat_runspeed < maxrunspeed)
+idx_T_still = np.logical_and(respmat_videoME < params['maxvideome'],
+                            respmat_runspeed < params['maxrunspeed'])
 fig,axes = plt.subplots(2,2,figsize=(3,3))
 ax = axes[0,0]
 sns.histplot(respmat_runspeed[idx_T_still],bins=np.linspace(-1,60,200),color='black',
@@ -182,7 +147,7 @@ ax.set_xlabel('Running speed (cm/s)')
 # plt.tight_layout()
 axes[0,1].axis('off')
 sns.despine(fig=fig, top=True, right=True,offset=0)
-my_savefig(fig,savedir,'StillTrials_Selection')
+# my_savefig(fig,savedir,'StillTrials_Selection')
 
 
 #%% 
@@ -191,8 +156,8 @@ fig, axes = plt.subplots(1,1,figsize=(6,2.5))
 ax = axes
 idx_N_FF              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'V1lab',),axis=0))[0]
 idx_N_FB              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'PMlab',),axis=0))[0]
-idx_T_still           = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                            sessions[ises].respmat_runspeed < maxrunspeed)
+idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
 respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
 meanpopact_FF          = np.nanmean(respdata[idx_N_FF,:],axis=0)
@@ -215,8 +180,8 @@ arealabelpairs  = ['V1unl','V1lab','PMunl','PMlab']
 narealabelpairs = len(arealabelpairs)
 corrmat = np.full((narealabelpairs,narealabelpairs,nSessions),np.nan)
 for ises in range(nSessions):
-    idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed)
+    idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                                sessions[ises].respmat_runspeed < params['maxrunspeed'])
     # idx_T_still = np.ones(np.sum(idx_T_still),dtype=bool)
     datamat = np.full((narealabelpairs,np.sum(idx_T_still)),np.nan)
     nsampleneurons = 1000
@@ -252,9 +217,11 @@ ises = 6
 maxrunspeed = 0.5
 maxvideome = 0.2
 
-idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed))[0]
-
+# idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
+#                                 sessions[ises].respmat_runspeed < maxrunspeed))[0]
+idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                                sessions[ises].respmat_runspeed < params['maxrunspeed']))[0]
+                                
 arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
 # axislabels  = ['V1unl','V1lab','PMunl','PMlab']
 # axislabels = arealabeled_to_figlabels(alp.split('-')[0])
@@ -271,11 +238,11 @@ for ialp,alp in enumerate(arealabelpairs):
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
     idx_source_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                                sessions[ises].celldata['noise_level']<maxnoiselevel,
+                                                # sessions[ises].celldata['noise_level']<maxnoiselevel,
                                                 sessions[ises].celldata['nearby']
                                                 ),axis=0))[0]
     idx_source_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                                sessions[ises].celldata['noise_level']<maxnoiselevel,
+                                                # sessions[ises].celldata['noise_level']<maxnoiselevel,
                                                 sessions[ises].celldata['nearby']
                                                 ),axis=0))[0]
 
@@ -330,9 +297,10 @@ for ial,alp in enumerate(arealabelpairs):
                                         ),axis=0))[0]
     meanpopact_N2          = np.nanmean(respdata[idx_N2,:],axis=0)
 
-    idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed)
-    
+    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
+                                # sessions[ises].respmat_runspeed < maxrunspeed)
+    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
     # meanpopact = meanpopact_N1
     meanpopact = meanpopact_N1 - meanpopact_N2
 
@@ -386,8 +354,11 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-    idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed)
+    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
+
+    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
+    #                             sessions[ises].respmat_runspeed < maxrunspeed)
     diffdata            = np.full((narealabelpairs,np.sum(idx_T_still)),np.nan)
     targetareadata      = np.full((narealabelpairs,np.sum(idx_T_still)),np.nan)
     for ialp,alp in enumerate(arealabelpairs):
@@ -521,25 +492,16 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-    idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                sessions[ises].respmat_runspeed < maxrunspeed)
-    
+    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
+                                # sessions[ises].respmat_runspeed < maxrunspeed)
+    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
     for ialp,alp in enumerate(arealabelpairs):
-        idx_N1              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                    # sessions[ises].celldata['nearby']
-                                      ),axis=0))[0]
+        idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
         
-        idx_N2              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                    # sessions[ises].celldata['nearby']
-                                      ),axis=0))[0]
+        idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
 
-        idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
-                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
+        idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
         # subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
         # idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
@@ -547,14 +509,13 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
             continue
-        
-        #Just mean activity:
-        # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
-        #Ratio:
-        # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) / np.nanmean(respdata[idx_N2,:],axis=0)
-        #Difference:
-        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
-        # meanpopact          = np.nanmean(respdata[idx_N2,:],axis=0) - np.nanmean(respdata[idx_N1,:],axis=0)
+                
+        if params['activitymetric'] == 'mean':#Just mean activity:
+            meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
+        elif params['activitymetric'] == 'ratio': #Ratio:
+            meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) / np.nanmean(respdata[idx_N2,:],axis=0)
+        elif params['activitymetric'] == 'difference': #Difference:
+            meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
 
         # compute meanresp for trials with low and high difference in lab-unl activation
         meanresp            = np.empty([N,len(oris),2])
@@ -645,7 +606,7 @@ legendlabels        = ['FF','FB']
 idx_examples = np.all((params_regress[:,ialp,0]>np.nanpercentile(params_regress[:,ialp,0],90),
                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-                        rangeresp>0.04,
+                        rangeresp>params['minrangeresp'],
                        ),axis=0)
 # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 
@@ -653,7 +614,7 @@ idx_examples = np.all((params_regress[:,ialp,0]>np.nanpercentile(params_regress[
 idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-                        rangeresp>0.04,
+                        rangeresp>params['minrangeresp'],
                        ),axis=0)
 
 example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
@@ -664,7 +625,7 @@ idx_examples = np.all((
                         # params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
                        params_regress[:,ialp,1]>np.nanpercentile(params_regress[:,ialp,1],70),
                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],75),
-                        rangeresp>0.04,
+                        rangeresp>params['minrangeresp'],
                        ),axis=0)
 # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 
@@ -674,7 +635,7 @@ idx_examples = np.all((
                         # params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
                        params_regress[:,ialp,1]>np.nanpercentile(params_regress[:,ialp,1],80),
                         # params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-                        rangeresp>0.04,
+                        rangeresp>params['minrangeresp'],
                        ),axis=0)
 # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 
@@ -852,7 +813,7 @@ for ialp,alp in enumerate(arealabelpairs):
     # idx_N = corrsig_cells[ialp,:]==-1
     idx_N =  np.all((
                     # celldata['gOSI']>0.4,
-                    rangeresp>minrangeresp,
+                    rangeresp>params['minrangeresp'],
                     # sig_params_regress[:,ialp,0]==1,
                     # corrsig_cells[ialp,:]==1,
                     # corrsig_cells[ialp,:]==1,
@@ -886,7 +847,7 @@ sns.despine(fig=fig, top=True, right=True,offset=3,trim=True)
 sign = 1
 fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
 ax = axes
-idx_N =  rangeresp>minrangeresp
+idx_N =  rangeresp>params['minrangeresp']
 sigmat = np.empty((3,2))
 countmat = np.empty((3,2))
 for itype,(mult,add) in enumerate(zip([1,0,1],[0,1,1])):
@@ -916,7 +877,7 @@ my_savefig(fig,savedir,'FF_FB_affinemodulation_sig_posmod_%dsessions' % (nSessio
 sign = -1
 fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
 ax = axes
-idx_N =  rangeresp>minrangeresp
+idx_N =  rangeresp>params['minrangeresp']
 sigmat = np.empty((3,2))
 countmat = np.empty((3,2))
 for itype,(mult,add) in enumerate(zip([-1,0,-1],[0,-1,-1])):
@@ -950,7 +911,7 @@ my_savefig(fig,savedir,'FF_FB_affinemodulation_sig_negmod_%dsessions' % (nSessio
 #     for isign,(sign,signlabel) in enumerate(zip([1,-1],['pos','neg'])):
 #         for ialp,alp in enumerate(arealabelpairs):
 #             idx_N =  np.all((
-#                 rangeresp>minrangeresp,
+#                 rangeresp>params['minrangeresp'],
 #                 corrsig_cells[ialp,:]==1,
 #                      ),axis=0)
 #             # frac = np.sum(sig_params_regress[:,ialp,itype]==sign) / np.sum(~np.isnan(sig_params_regress[:,ialp,itype]))
@@ -1057,10 +1018,10 @@ for iparam in range(2):
     handles = []
     for ialp,alp in enumerate(arealabelpairs):
         
-        idx_N =  rangeresp>minrangeresp
+        idx_N =  rangeresp>params['minrangeresp']
         # idx_N =  sig_params_regress[:,ialp,1]==1
         idx_N = np.all((
-                rangeresp>minrangeresp,
+                rangeresp>params['minrangeresp'],
                 np.any(corrsig_cells==1,axis=0),
                 # np.any(corrsig_cells==-1,axis=0),
                 ),axis=0)
@@ -1162,7 +1123,7 @@ handles = []
 bootdata = np.full((narealabelpairs,len(bins)-1,nboots),np.nan)
 bootci = np.full((narealabelpairs,2,len(bins)-1),np.nan)
 for ialp,alp in enumerate(arealabelpairs):
-    idx_N =  rangeresp>minrangeresp
+    idx_N =  rangeresp>params['minrangeresp']
     xdata = np.nanmean(mean_resp_split[np.ix_([ialp],range(16),[0,1],idx_N)],axis=(0,2)).flatten()
     ydata = resp_mod[np.ix_([ialp],range(16),idx_N)].flatten()
     # plot_binned_ci(ax,xdata,ydata,bins,clrs_arealabelpairs[ialp])
@@ -1198,7 +1159,7 @@ for ibin in range(len(bincenters)):
 ax = axes[1]
 for ialp,alp in enumerate(arealabelpairs):
     idx_N = np.all((
-                rangeresp>minrangeresp,
+                rangeresp>params['minrangeresp'],
                 # corrsig_cells[ialp,:]==1,
                 sig_params_regress[:,ialp,0]==1,
                 ),axis=0)
@@ -1238,7 +1199,7 @@ for ibin in range(len(bincenters)):
 ax = axes[2]
 for ialp,alp in enumerate(arealabelpairs):
     idx_N = np.all((          
-                rangeresp>minrangeresp,
+                rangeresp>params['minrangeresp'],
                 # corrsig_cells[ialp,:]!=-1,
                 sig_params_regress[:,ialp,1]==1,
                 ),axis=0)
@@ -1376,7 +1337,7 @@ for isign,sign in enumerate([-1,1]):
             # idx_N = params_regress[:,ialp,2] > 0.5
             idx_N =  np.all((
                              celldata['gOSI']>0.4,
-                            #  rangeresp>0.04,
+                            #  rangeresp>params['minrangeresp'],
                              corrsig_cells[ialp,:]==sign),axis=0)
             # print(np.sum(idx_N))
             sns.histplot(data=params_regress[idx_N,ialp,iparam],element='step',
@@ -1414,8 +1375,8 @@ fig,axes = plt.subplots(1,2,figsize=(5,2.5),sharey=True,sharex=True)
 for ialp,alp in enumerate(legendlabels): #Mult and Add
     ax = axes[ialp]
     idx_N = np.all((
-            celldata['gOSI']>0,
-            rangeresp>0.04,
+            # celldata['gOSI']>0,
+            rangeresp>params['minrangeresp'],
                 ),axis=0)
     x = params_regress[idx_N,ialp,0]
     y = params_regress[idx_N,ialp,1]
@@ -1973,3 +1934,32 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 
 # temp = mean_resp_split[ialp,i,:,np.logical_and(sessions[ises].trialdata['Orientation']==ori,idx_K1)]
 # print(alp,ori,np.nanmean(temp),np.nanstd(temp),np.nanmedian(temp),np.nanpercentile(temp,25),np.nanpercentile(temp,75))
+
+
+
+# #%% For every session remove behavior related variability:
+# rank_behavout = 3
+# # maxnoiselevel = 20
+
+# #%%
+# for ises in range(nSessions):
+#     # Convert response_matrix and orientations_vector to numpy arrays
+#     # response_matrix         = np.array(response_matrix)
+#     conditions_vector       = np.array(sessions[ises].trialdata['stimCond'])
+#     conditions              = np.sort(np.unique(conditions_vector))
+#     C                       = len(conditions)
+
+#     resp_mean       = sessions[ises].respmat.copy()
+#     # resp_res        = sessions[ises].respmat.copy()
+
+#     for iC,cond in enumerate(conditions):
+#         tempmean                            = np.nanmean(sessions[ises].respmat[:,conditions_vector==cond],axis=1)
+#         # resp_mean[:,iC]                     = tempmean
+#         resp_mean[:,conditions_vector==cond] = tempmean[:,np.newaxis]
+
+#     Y               = sessions[ises].respmat.copy()
+#     Y               = Y - resp_mean
+#     [Y_orig,Y_hat,Y_out,rank,ev] = regress_out_behavior_modulation(sessions[ises],X=None,Y=Y.T,
+#                                 nvideoPCs = 30,rank=rank_behavout,lam=0,perCond=True,kfold = 5)
+#     # print(ev)
+#     sessions[ises].respmat_behavout = Y_out.T + resp_mean

@@ -136,14 +136,14 @@ clrs_areas          = get_clr_areas(areas)
 
 
 #%% Scatter plot as a function of depth:
-fig, ax = plt.subplots(figsize=(4*cm,6*cm))
+fig, ax = plt.subplots(figsize=(4.5*cm,7*cm))
 # sns.scatterplot(data=planedata,x='depth',y='frac_labeled',hue='roi_name',palette=clrs_areas,ax=ax,s=14,hue_order=areas)
 sns.scatterplot(data=planedata,y='depth',x='frac_labeled',hue='roi_name',palette=clrs_areas,ax=ax,s=14,hue_order=areas)
 sns.lineplot(x=planedata['frac_labeled'],y=planedata['depth'].round(-2),
              hue=planedata['roi_name'],palette=clrs_areas,ax=ax,hue_order=areas,   orient="y")
 ax.set_xlabel('Fraction labeled in plane')
 ax.set_ylabel(r'Cortical depth ($\mu$m)')
-ax.set_ylim([50,500])
+ax.set_ylim([75,500])
 ax.invert_yaxis()
 ax_nticks(ax,5)
 sns.despine(fig=fig, top=True, right=True,offset=3)

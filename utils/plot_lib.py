@@ -17,16 +17,18 @@ from scipy.stats import pearsonr,ttest_rel
 import copy
 from statannotations.Annotator import Annotator
 
-desired_width = 600
-pd.set_option('display.width', desired_width)
-pd.set_option("display.max_columns", 14)
+def set_plot_basic_config():
+    plt.rcParams.update({'font.size': 6, 'xtick.labelsize': 7, 'ytick.labelsize': 7, 'axes.titlesize': 8,
+                     'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
+    desired_width = 600
+    pd.set_option('display.width', desired_width)
+    pd.set_option("display.max_columns", 14)
 
 def my_savefig(fig,savedir,filename,formats=['png','pdf']):
     for fmt in formats:
         fig.savefig(os.path.join(savedir,filename +  '.' + fmt),format = fmt,dpi=600,bbox_inches='tight',transparent=True)
     # fig.savefig(os.path.join(savedir,filename +  '.png'),format = 'png',dpi=300,bbox_inches='tight',transparent=True)
     # fig.savefig(os.path.join(savedir,filename +  '.pdf'),format = 'pdf',dpi=300,bbox_inches='tight',transparent=True)
-
 
 def shaded_error(x,y,yerror=None,ax=None,center='mean',error='std',color='black',
                  alpha=0.25,linewidth=2,linestyle='-',label=None):
@@ -373,27 +375,6 @@ def arealabeled_to_figlabels(arealabeled):
         'RSPlab' :  "$RSP_{PM}$"}
     return itemgetter(*arealabeled)(table)
 
-def get_clr_deltaoris(deltaoris,version=90):
-    # c = ["darkred","darkgreen"]
-    # v = [0,1.]
-    # l = list(zip(v,c))
-    # cmap=LinearSegmentedColormap.from_list('rg',l, N=256)
-    # colors = cmap((45-np.mod(deltaoris,90))/45)
-    # c = ["darkgreen","darkblue","darkred"]
-    c = ["darkred","darkblue","darkgreen"]
-    v = [0,.5,1.]
-    l = list(zip(v,c))
-    cmap=LinearSegmentedColormap.from_list('gbr',l, N=256)
-
-    # cmap = sns.color_palette('viridis', as_cmap=True)
-    # colors = cmap((90-np.mod(deltaoris,180))/90)
-    if version == 90: 
-        colors = cmap(np.abs(90-deltaoris)/90)
-    elif version == 180:
-        colors = cmap(np.abs(180-deltaoris)/180)
-        
-    return colors
-
 def get_clr_labelpairs(pairs):
     palette       = {'unl-unl': sns.xkcd_rgb['grey'],
         'unl-lab' : sns.xkcd_rgb['rose'],
@@ -524,17 +505,6 @@ def get_clr_recombinase(enzymes):
         'flp' : 'indianred'}
     return itemgetter(*enzymes)(palette)
 
-def get_clr_protocols(protocols):
-    palette       = {'GR': sns.xkcd_rgb['pinky red'],
-                    'GN': sns.xkcd_rgb['bright blue'],
-                    'SP' : sns.xkcd_rgb['coral'],
-                    'RF' : sns.xkcd_rgb['emerald'],
-                    'IM' : sns.xkcd_rgb['very dark green'],
-                    'DM' : sns.xkcd_rgb['grape'],
-                    'DN' : sns.xkcd_rgb['emerald'],
-                    'DP' : sns.xkcd_rgb['neon blue']
-}
-    return itemgetter(*protocols)(palette)
 
 def get_clr_animal_id(animal_ids):
     # clrs            = sns.color_palette('inferno', len(signals))
