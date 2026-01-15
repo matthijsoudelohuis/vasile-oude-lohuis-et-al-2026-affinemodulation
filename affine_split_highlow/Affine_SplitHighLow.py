@@ -11,7 +11,6 @@ from sklearn.metrics import r2_score
 from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr
 from scipy import stats
 
-# os.chdir('e:\\Python\\molanalysis')
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
@@ -21,7 +20,6 @@ from utils.tuning import compute_tuning_wrapper
 from utils.gain_lib import * 
 from utils.pair_lib import compute_pairwise_anatomical_distance,value_matching,filter_nearlabeled
 from utils.plot_lib import * #get all the fixed color schemes
-# from loaddata.session_info import assign_layer,assign_layer2
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\SplitTrials\\')
 
@@ -30,15 +28,11 @@ params  = load_params()
 set_plot_basic_config()
 cm      = 1/2.54  # centimeters in inches
 
-#%% 
-arealabelpairs  = [
-                    'V1lab-V1unl-PMunlL2/3',
-                    'PMlab-PMunl-V1unlL2/3',
-                    ]
-
+#%% Get colors
+arealabelpairs  = ['V1lab-V1unl-PMunlL2/3',
+                    'PMlab-PMunl-V1unlL2/3']
 clrs_arealabelpairs         = get_clr_arealabelpairs(arealabelpairs)
 clrs_arealabels_low_high    = get_clr_area_low_high()  # PMlab-PMunl-V1unl
-# minrangeresp                = params['minrangeresp']
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
@@ -54,6 +48,7 @@ sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
 #%%  Load data properly:
 for ises in range(nSessions):
     sessions[ises].load_respmat(calciumversion=params['calciumversion'])
+    # sessions[ises].respmat  /= sessions[ises].celldata['meanF'].to_numpy()[:,None] #convert to deconv/F0
 
 #%% Compute Tuning Metrics (gOSI, gDSI etc.)
 sessions = compute_tuning_wrapper(sessions)
@@ -62,34 +57,37 @@ sessions = compute_tuning_wrapper(sessions)
 for ises in range(nSessions):   
     sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'])
 
-#%%  #assign arealayerlabel
-# for ises in range(nSessions):   
-#     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
-#     sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
-#     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
+#%% Get concatenated data:
+sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
+celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
-#     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
 
-# #%% 
-# arealayers = np.array(['V1L2/3','PML2/3','PML5'])
-# narealayers = len(arealayers)
-# maxnoiselevel = 20
-# celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
-# clrs = ['black','red']
-# fig,axes = plt.subplots(1,narealayers,figsize=(narealayers*3,3),sharey=True,sharex=True)
+#%% Show preferred orientation across all cells in GR protocol:
+areas       = ['V1','PM']
+labeled     = ['unl','lab']
 
-# for ial,al in enumerate(arealayers):
-#     ax = axes[ial]
-#     idx_N              = np.all((
-#                                 celldata['noise_level']<maxnoiselevel,
-#                                 celldata['arealayer']==al,
-#                                 celldata['nearby'],
-#                                     ),axis=0)
+fig,axes = plt.subplots(1,2,figsize=(5,2.5),sharex=True,sharey=True)
+for iarea,area in enumerate(areas):
+    ax = axes[iarea]
+    for ilab,lab in enumerate(labeled):
+        df = pd.DataFrame({'Ori': celldata.loc[(celldata['roi_name']==area)&(celldata['labeled']==lab),'pref_ori']})
+        ax.hist(df['Ori'],bins=np.arange(0,360+22.5,22.5)-22.5/2,
+            histtype='step',color=get_clr_area_labeled([area+lab]),label=lab,alpha=1,density=True)
+    leg = ax.legend(labeled,frameon=False,ncol=1,loc='upper right')
+    for lh in leg.legend_handles:
+        lh.set_visible(False)
+    for text, color in zip(leg.texts, get_clr_area_labeled([area+labeled[0],area+labeled[1]])):
+        text.set_color(color)
+    ax.set_xlabel('Pref. Ori (deg)')
+    if iarea == 0: 
+        ax.set_ylabel('Density (a.u.)')
+    ax.set_xticks(np.arange(0,360,45))
+    ax.set_xlim([-10, 340]) #ax.set_xticks(np.arange(0,360,45))
+    ax.set_title('%s' % area)
+plt.tight_layout()
+# fig.savefig(os.path.join('E:\\OneDrive\\PostDoc\\Figures\\Neural - Gratings\\Tuning\\','PreferredOri_%s_GR' % (calciumversion) + '.png'), format = 'png')
+# fig.savefig(os.path.join('E:\\OneDrive\\PostDoc\\Figures\\Neural - Gratings\\Tuning\\','PreferredOri_%s_GR' % (corr_type) + '.png'), format = 'png')
 
-#     sns.histplot(data=celldata[idx_N],x='pop_coupling',hue='arealayerlabel',color='green',element="step",stat="density", 
-#                 common_norm=False,fill=False,bins=np.linspace(-0.3,1,1000),cumulative=True,ax=ax,palette=clrs,legend=False)
-#     ax.set_title(al)
-# sns.despine(fig=fig, top=True, right=True,offset=0)
 
 # %%
  #####  ####### ### #       #          ####### ######  ###    #    #        #####  
@@ -101,12 +99,6 @@ for ises in range(nSessions):
  #####     #    ### ####### #######       #    #     # ### #     # #######  #####  
 
 #%% 
-# respmat_videoME = []
-# for ises in range(nSessions):   
-#     respmat_videoME.append(list(sessions[ises].respmat_videome))
-# maxvideome              = 0.2
-# maxrunspeed             = 0.5
-
 respmat_videoME = np.array([])
 respmat_runspeed = np.array([])
 for ises in range(nSessions):
@@ -134,12 +126,9 @@ sns.histplot(y=respmat_videoME[~idx_T_still],bins=np.linspace(0,1,200),color='gr
 ax.text(0.4,0.8,'Still (Included)',color='black',transform=ax.transAxes,fontsize=9)
 ax.text(0.4,0.7,'Moving (Excluded)',color='grey',transform=ax.transAxes,fontsize=9)
 
-
 ax = axes[1,0]
-# sns.scatterplot(ax=ax,x=respmat_videoME,y=respmat_runspeed,alpha=0.25,s=4,hue=idx_T_still,
 sns.scatterplot(ax=ax,x=respmat_runspeed,y=respmat_videoME,alpha=0.25,s=4,hue=idx_T_still,
                 palette=['grey','black'],legend=False)
-# ax.legend(['Still','Moving'],fontsize=9,frameon=False)
 ax.text(0.3,0.6,'n = %d/%d \nstill trials \n(%.1f%%)' % (np.sum(idx_T_still),len(idx_T_still),np.sum(idx_T_still)/len(idx_T_still)*100),
         transform=ax.transAxes,fontsize=6)
 ax.set_ylabel('Video ME (norm.)')
@@ -214,27 +203,18 @@ cbar.set_label('Correlation', rotation=270, labelpad=10)
 
 #%% 
 ises = 6
-maxrunspeed = 0.5
-maxvideome = 0.2
-
-# idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-#                                 sessions[ises].respmat_runspeed < maxrunspeed))[0]
 idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                                 sessions[ises].respmat_runspeed < params['maxrunspeed']))[0]
                                 
 arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
 # axislabels  = ['V1unl','V1lab','PMunl','PMlab']
-# axislabels = arealabeled_to_figlabels(alp.split('-')[0])
 
 vscale      = 0.015
-# vscale      = 2
-# fig,axes    = plt.subplots(1,2,figsize=(6,3))
-# maxnoiselevel = 20
-# fig,axes = plt.subplots(2,2,figsize=(6,6))
+
 fig,axes = plt.subplots(2,1,figsize=(3.5,6))
 for ialp,alp in enumerate(arealabelpairs):
     respdata        = sessions[ises].respmat
-    # respdata        = zscore(sessions[ises].respmat, axis=1)
+
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
     idx_source_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
@@ -273,43 +253,41 @@ for ialp,alp in enumerate(arealabelpairs):
 my_savefig(fig,savedir,'Diff_LabUnl_%s' % sessiondata['session_id'][ises])
 
 #%% Show the distribution of mean activity of the labeled population and the selection of the
-# extreme percentiles:
 arealabelpairs  = ['V1lab','PMlab']
 arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
-
-# clrs_arealabelpairs = get_clr_arealabelpairs(arealabelpairs)
-legendlabels        = ['FF','FB']
-clrs_arealabels_low_high = get_clr_area_low_high()
+legendlabels    = ['FF','FB']
 
 respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
+respdata            = sessions[ises].respmat 
 
-perc = 25
+# perc = 25
 step  = 0.001
 fig, axes = plt.subplots(1,2,figsize=(6,3))
 for ial,alp in enumerate(arealabelpairs):
     ax = axes[ial]
-    idx_N1              = np.where(np.all((
-                                        sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                        ),axis=0))[0]
-    meanpopact_N1          = np.nanmean(respdata[idx_N1,:],axis=0)
-    idx_N2              = np.where(np.all((
-                                        sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                        ),axis=0))[0]
-    meanpopact_N2          = np.nanmean(respdata[idx_N2,:],axis=0)
+    idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
+    meanpopact_N1       = np.nanmean(respdata[idx_N1,:],axis=0)
+    idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
+    meanpopact_N2       = np.nanmean(respdata[idx_N2,:],axis=0)
 
-    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                # sessions[ises].respmat_runspeed < maxrunspeed)
-    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+    idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
-    # meanpopact = meanpopact_N1
-    meanpopact = meanpopact_N1 - meanpopact_N2
+
+    if params['activitymetric'] == 'mean':#Just mean activity:
+        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
+    elif params['activitymetric'] == 'ratio': #Ratio:
+        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) / np.nanmean(respdata[idx_N2,:],axis=0)
+    elif params['activitymetric'] == 'difference': #Difference:
+        meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
+
+    # meanpopact = meanpopact_N1 - meanpopact_N2
 
     allbins = np.arange(np.percentile(meanpopact[idx_T_still],0),np.percentile(meanpopact[idx_T_still],100),step)
-    bins = allbins[allbins <= np.percentile(meanpopact[idx_T_still],perc)]
-    sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins[bins<np.percentile(meanpopact[idx_T_still],perc)],color=clrs_arealabels_low_high[ial,0],edgecolor='none')
-    bins = allbins[np.logical_and(allbins >= np.percentile(meanpopact[idx_T_still],perc), allbins <= np.percentile(meanpopact[idx_T_still],100-perc))]
+    bins = allbins[allbins <= np.percentile(meanpopact[idx_T_still],params['splitperc'])]
+    sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins[bins<np.percentile(meanpopact[idx_T_still],params['splitperc'])],color=clrs_arealabels_low_high[ial,0],edgecolor='none')
+    bins = allbins[np.logical_and(allbins >= np.percentile(meanpopact[idx_T_still],params['splitperc']), allbins <= np.percentile(meanpopact[idx_T_still],100-params['splitperc']))]
     sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color='grey',edgecolor='none')
-    bins = allbins[allbins > np.percentile(meanpopact[idx_T_still],100-perc)]
+    bins = allbins[allbins > np.percentile(meanpopact[idx_T_still],100-params['splitperc'])]
     sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color=clrs_arealabels_low_high[ial,1],edgecolor='none')
     # ax.set_ylabel('FB (high)',fontsize=10)
     ax.set_xlabel('Population activity (deconv/dF0)',fontsize=10)
@@ -318,7 +296,7 @@ for ial,alp in enumerate(arealabelpairs):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
 # my_savefig(fig,savedir,'Hist_PopAct_FF_FB')
-my_savefig(fig,savedir,'Hist_PopAct_FF_FB%s' % sessiondata['session_id'][ises])
+# my_savefig(fig,savedir,'Hist_PopAct_FF_FB%s' % sessiondata['session_id'][ises])
 
 #%%
 
@@ -362,20 +340,27 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
     diffdata            = np.full((narealabelpairs,np.sum(idx_T_still)),np.nan)
     targetareadata      = np.full((narealabelpairs,np.sum(idx_T_still)),np.nan)
     for ialp,alp in enumerate(arealabelpairs):
-        idx_N1              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
+        idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
         
-        idx_N2              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                    sessions[ises].celldata['nearby']
-                                      ),axis=0))[0]
+        idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
+
+        idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
+
+
+        # idx_N1              = np.where(np.all((
+        #                             sessions[ises].celldata['arealabel'] == alp.split('-')[0],
+        #                             sessions[ises].celldata['noise_level']<maxnoiselevel,
+        #                               ),axis=0))[0]
         
-        idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
-                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
+        # idx_N2              = np.where(np.all((
+        #                             sessions[ises].celldata['arealabel'] == alp.split('-')[1],
+        #                             sessions[ises].celldata['noise_level']<maxnoiselevel,
+        #                             sessions[ises].celldata['nearby']
+        #                               ),axis=0))[0]
+        
+        # idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
+        #                               sessions[ises].celldata['noise_level']<maxnoiselevel,
+        #                               ),axis=0))[0]
         
         if (len(idx_N1) < minnneurons) or (len(idx_N2) < minnneurons) or (len(idx_N3) < minnneurons):
             continue
@@ -450,7 +435,6 @@ for ialp in range(narealabelpairs):
 
 
 
-
 #%% Show tuning curve when activity in the other area is low or high (only still trials)
 arealabelpairs  = [
                     'V1lab-V1unl-PMunlL2/3',
@@ -464,15 +448,14 @@ celldata                = pd.concat([sessions[ises].celldata for ises in range(n
 nOris                   = 16
 nCells                  = len(celldata)
 oris                    = np.sort(sessions[0].trialdata['Orientation'].unique())
-perc                    = 25
 
 #criteria for selecting still trials:
 maxvideome              = 0.2
-maxrunspeed             = 5
+# maxrunspeed             = 5
 alphathr                = 0.001 #threshold for correlation with cross area rate
 
 minnneurons             = 10
-maxnoiselevel           = 20
+# maxnoiselevel           = 20
 mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
@@ -496,6 +479,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
                                 # sessions[ises].respmat_runspeed < maxrunspeed)
     idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
+    
     for ialp,alp in enumerate(arealabelpairs):
         idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
         
@@ -526,8 +510,8 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
             # idx_T               = ori_ses == ori
             idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
 
-            idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],perc)
-            idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-perc)
+            idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])
+            idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])
             meanresp[:,i,0]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1)
             meanresp[:,i,1]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1)
             errorresp[:,i,0]    = np.nanstd(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1) / np.sqrt(np.sum(np.logical_and(idx_T,idx_K1)))
@@ -1073,32 +1057,6 @@ for ivarx,varx in enumerate(['slope','offset','affine_R2']):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 
-#%%
-
-
-# def plot_binned_ci(ax,xdata,ydata,bins,clr):
-#     bincenters      = (bins[:-1]+bins[1:])/2 #get bin centers
-
-#     idx_notnan = np.logical_and(~np.isnan(xdata),~np.isnan(ydata))
-#     xdata = xdata[idx_notnan]
-#     ydata = ydata[idx_notnan]
-#     ymeandata = binned_statistic(xdata, ydata, statistic='mean', 
-#                             bins=bins)[0]
-
-#     nboots = 250
-#     for iboot in range(nboots):
-#         idx = np.random.choice(len(xdata),size=len(xdata),replace=True)
-#         xboot = xdata[idx]
-#         yboot = ydata[idx]
-#         bootdata[ialp,:,iboot] = binned_statistic(xboot, yboot, statistic='mean', 
-#                             bins=bins)[0]
-#     bootci[ialp,:,:] = np.percentile(bootdata[ialp,:,:],[(100-ci)/2,100-(100-ci)/2],axis=1)
-#     ax.plot(bincenters,ymeandata,color=clrs_arealabelpairs[ialp],marker='o',linestyle='None',markersize=4)
-#     handles.append(ax.plot(bincenters,ymeandata,color=clrs_arealabelpairs[ialp],
-#         linewidth=1.5)[0])
-#     ax.fill_between(bincenters,bootci[ialp,0,:],bootci[ialp,1,:],color=clrs_arealabelpairs[ialp],
-#                     alpha=0.3)
-
 
 
 
@@ -1200,7 +1158,6 @@ ax = axes[2]
 for ialp,alp in enumerate(arealabelpairs):
     idx_N = np.all((          
                 rangeresp>params['minrangeresp'],
-                # corrsig_cells[ialp,:]!=-1,
                 sig_params_regress[:,ialp,1]==1,
                 ),axis=0)
     xdata = np.nanmean(mean_resp_split[np.ix_([ialp],range(16),[0,1],idx_N)],axis=(0,2)).flatten()
@@ -1497,38 +1454,11 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         # idx_N2              = sessions[ises].celldata['arealayerlabel'] == alp.split('-')[1]
         # idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2]
 
-        idx_N1              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                    # sessions[ises].celldata['arealayerlabel'] == alp.split('-')[0],
-                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                    #   sessions[ises].celldata['tuning_var']>0.025,
-                                    #   sessions[ises].celldata['OSI']>0.5,
-                                    #   sessions[ises].celldata['gOSI']>0.5,
-                                    # idx_nearby,
+        idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
+        
+        idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
 
-                                      ),axis=0))[0]
-        idx_N2              = np.where(np.all((
-                                    sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                    # sessions[ises].celldata['arealayerlabel'] == alp.split('-')[1],
-                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                        # sessions[ises].celldata['gOSI']>0.5,
-                                        #   sessions[ises].celldata['OSI']>0.5,
-                                    # idx_nearby,
-                                      ),axis=0))[0]
-
-        idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
-                                    #   sessions[ises].celldata['tuning_var']>0.025,
-                                    #   sessions[ises].celldata['gOSI']>np.nanpercentile(sessions[ises].celldata['gOSI'],50),
-                                    #   sessions[ises].celldata['OSI']>0.5,
-                                    #   sessions[ises].celldata['gOSI']>0.5,
-                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                      ),axis=0))[0]
-
-        # if len(idx_N1) < minnneurons or len(idx_N2) < minnneurons or len(idx_N3) < minnneurons:
-            # continue
-
-        # if len(idx_N1) < minnneurons:
-        #     continue
+        idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
         if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
             continue
@@ -1564,8 +1494,8 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
             corrdata_boot[ialp,ises,iboot] = np.corrcoef(np.nanmean(respdata[bootidx_N1,:],axis=0),
                                               np.nanmean(respdata[bootidx_N3,:],axis=0))[0,1]
         
-        # idx_K1              = meanpopact < np.nanpercentile(meanpopact,perc)
-        # idx_K2              = meanpopact > np.nanpercentile(meanpopact,100-perc)
+        # idx_K1              = meanpopact < np.nanpercentile(meanpopact,params['splitperc'])
+        # idx_K2              = meanpopact > np.nanpercentile(meanpopact,100-params['splitperc'])
         # # compute meanresp for trials with low and high difference in lab-unl activation
         # meanresp            = np.empty([N,len(oris),2])
         # ori_ses             = sessions[ises].trialdata['Orientation']
@@ -1580,8 +1510,8 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         oris                = np.unique(ori_ses)
         for i,ori in enumerate(oris):
             idx_T               = ori_ses == ori
-            idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],perc)
-            idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-perc)
+            idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])
+            idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])
             meanresp[:,i,0] = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1)
             meanresp[:,i,1] = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1)
             
@@ -1880,8 +1810,8 @@ for ises in range(nSessions):
         idx_N2              = sessions[ises].celldata['arealabel'] == alp.split('-')[1]
 
         meanpopact          = np.nanmean(respmat[idx_N1,:],axis=0)
-        idx_K1              = meanpopact < np.nanpercentile(meanpopact,perc)
-        idx_K2              = meanpopact > np.nanpercentile(meanpopact,100-perc)
+        idx_K1              = meanpopact < np.nanpercentile(meanpopact,params['splitperc'])
+        idx_K2              = meanpopact > np.nanpercentile(meanpopact,100-params['splitperc'])
 
         # compute meanresp
         meanresp            = np.empty([N,len(oris),2])
@@ -1963,3 +1893,32 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 #                                 nvideoPCs = 30,rank=rank_behavout,lam=0,perCond=True,kfold = 5)
 #     # print(ev)
 #     sessions[ises].respmat_behavout = Y_out.T + resp_mean
+
+#%%  #assign arealayerlabel
+# for ises in range(nSessions):   
+#     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
+#     sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
+#     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
+
+#     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
+
+# #%% 
+# arealayers = np.array(['V1L2/3','PML2/3','PML5'])
+# narealayers = len(arealayers)
+# maxnoiselevel = 20
+# celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
+# clrs = ['black','red']
+# fig,axes = plt.subplots(1,narealayers,figsize=(narealayers*3,3),sharey=True,sharex=True)
+
+# for ial,al in enumerate(arealayers):
+#     ax = axes[ial]
+#     idx_N              = np.all((
+#                                 celldata['noise_level']<maxnoiselevel,
+#                                 celldata['arealayer']==al,
+#                                 celldata['nearby'],
+#                                     ),axis=0)
+
+#     sns.histplot(data=celldata[idx_N],x='pop_coupling',hue='arealayerlabel',color='green',element="step",stat="density", 
+#                 common_norm=False,fill=False,bins=np.linspace(-0.3,1,1000),cumulative=True,ax=ax,palette=clrs,legend=False)
+#     ax.set_title(al)
+# sns.despine(fig=fig, top=True, right=True,offset=0)
