@@ -1,5 +1,5 @@
 #%% 
-import os, math
+import os
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -8,7 +8,7 @@ from tqdm import tqdm
 from scipy.linalg import norm
 from sklearn.preprocessing import minmax_scale
 from sklearn.metrics import r2_score
-from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr
+from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr,ks_2samp
 from scipy import stats
 
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
@@ -16,7 +16,7 @@ os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 from params import load_params
 from loaddata.get_data_folder import get_local_drive
 from loaddata.session_info import filter_sessions,load_sessions
-from utils.tuning import compute_tuning_wrapper
+from utils.tuning import compute_tuning_wrapper,ori_remapping
 from utils.gain_lib import * 
 from utils.pair_lib import compute_pairwise_anatomical_distance,value_matching,filter_nearlabeled
 from utils.plot_lib import * #get all the fixed color schemes
@@ -51,6 +51,7 @@ for ises in range(nSessions):
     # sessions[ises].respmat  /= sessions[ises].celldata['meanF'].to_numpy()[:,None] #convert to deconv/F0
 
 #%% Compute Tuning Metrics (gOSI, gDSI etc.)
+sessions = ori_remapping(sessions)
 sessions = compute_tuning_wrapper(sessions)
 
 #%%
@@ -61,32 +62,63 @@ for ises in range(nSessions):
 sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
-
 #%% Show preferred orientation across all cells in GR protocol:
-areas       = ['V1','PM']
-labeled     = ['unl','lab']
+arealabels  = ['V1lab','V1unl','PMlab','PMunl']
 
-fig,axes = plt.subplots(1,2,figsize=(5,2.5),sharex=True,sharey=True)
-for iarea,area in enumerate(areas):
-    ax = axes[iarea]
-    for ilab,lab in enumerate(labeled):
-        df = pd.DataFrame({'Ori': celldata.loc[(celldata['roi_name']==area)&(celldata['labeled']==lab),'pref_ori']})
-        ax.hist(df['Ori'],bins=np.arange(0,360+22.5,22.5)-22.5/2,
-            histtype='step',color=get_clr_area_labeled([area+lab]),label=lab,alpha=1,density=True)
-    leg = ax.legend(labeled,frameon=False,ncol=1,loc='upper right')
-    for lh in leg.legend_handles:
-        lh.set_visible(False)
-    for text, color in zip(leg.texts, get_clr_area_labeled([area+labeled[0],area+labeled[1]])):
-        text.set_color(color)
-    ax.set_xlabel('Pref. Ori (deg)')
-    if iarea == 0: 
-        ax.set_ylabel('Density (a.u.)')
-    ax.set_xticks(np.arange(0,360,45))
-    ax.set_xlim([-10, 340]) #ax.set_xticks(np.arange(0,360,45))
-    ax.set_title('%s' % area)
+# def arealabeled_to_figlabels(arealabeled):
+
+fig,axes = plt.subplots(1,2,figsize=(9*cm,4*cm),sharex=True,sharey=True)
+ax = axes[0]
+arealabels  = ['V1unl','V1lab']
+clrs_area_labeled = get_clr_area_labeled(arealabels)
+pref_oris_unl = celldata.loc[celldata['arealabel']==arealabels[0],'pref_ori']
+pref_oris_lab = celldata.loc[celldata['arealabel']==arealabels[1],'pref_ori']
+ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
+    histtype='step',color=clrs_area_labeled[0],label=lab,alpha=1)
+ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
+    histtype='step',color=clrs_area_labeled[1],label=lab,alpha=1)
+leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
+
+stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
+ax.text(0.5, 0.05, 'KS-test (%1.2f),p=%1.2f' % (stat,pval), horizontalalignment='center',
+        transform=ax.transAxes,fontsize=6)
+for lh in leg.legend_handles:
+    lh.set_visible(False)
+for text, color in zip(leg.texts, get_clr_area_labeled(arealabels)):
+    text.set_color(color)
+ax.set_xlabel('Pref. direction (deg)')
+if iarea == 0: 
+    ax.set_ylabel('Density (a.u.)')
+ax.set_xticks(np.arange(0,360,45))
+ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
+ax.set_title('V1',color=clrs_area_labeled[0],fontsize=9)
+
+arealabels  = ['PMlab','PMunl']
+ax = axes[1]
+
+clrs_area_labeled = get_clr_area_labeled(arealabels)
+pref_oris_unl = celldata.loc[celldata['arealabel']==arealabels[0],'pref_ori']
+pref_oris_lab = celldata.loc[celldata['arealabel']==arealabels[1],'pref_ori']
+stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
+ax.text(0.5, 0.05, 'KS-test (%1.2f),p=%1.2f' % (stat,pval), horizontalalignment='center',
+        transform=ax.transAxes,fontsize=6)
+ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
+    histtype='step',color=clrs_area_labeled[0],label=lab,alpha=1)
+ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
+    histtype='step',color=clrs_area_labeled[1],label=lab,alpha=1)
+leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
+for lh in leg.legend_handles:
+    lh.set_visible(False)
+for text, color in zip(leg.texts, get_clr_area_labeled(arealabels)):
+    text.set_color(color)
+ax.set_xlabel('Pref. direction (deg)')
+ax.set_xticks(np.arange(0,360,45))
+ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
+ax.set_title('PM',color=clrs_area_labeled[0],fontsize=9)
+
 plt.tight_layout()
-# fig.savefig(os.path.join('E:\\OneDrive\\PostDoc\\Figures\\Neural - Gratings\\Tuning\\','PreferredOri_%s_GR' % (calciumversion) + '.png'), format = 'png')
-# fig.savefig(os.path.join('E:\\OneDrive\\PostDoc\\Figures\\Neural - Gratings\\Tuning\\','PreferredOri_%s_GR' % (corr_type) + '.png'), format = 'png')
+sns.despine(fig=fig,trim=False,offset=1,top=True,right=True)
+my_savefig(fig,savedir,'PrefStim_%dGRsessions' % (nSessions))
 
 
 # %%

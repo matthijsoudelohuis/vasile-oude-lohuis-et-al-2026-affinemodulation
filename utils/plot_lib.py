@@ -18,8 +18,8 @@ import copy
 from statannotations.Annotator import Annotator
 
 def set_plot_basic_config():
-    plt.rcParams.update({'font.size': 6, 'xtick.labelsize': 7, 'ytick.labelsize': 7, 'axes.titlesize': 8,
-                     'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
+    plt.rcParams.update({'font.size': 7, 'xtick.labelsize': 6, 'ytick.labelsize': 6, 'axes.titlesize': 8,
+                     'axes.labelsize': 7,'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
     desired_width = 600
     pd.set_option('display.width', desired_width)
     pd.set_option("display.max_columns", 14)
@@ -388,14 +388,15 @@ def get_clr_labelpairs(pairs):
     return itemgetter(*pairs)(palette)
 
 def get_clr_area_labeled(area_labeled):
-    palette       = {'V1unl': sns.xkcd_rgb['seaweed'],
-        'V1lab' : sns.xkcd_rgb['rose'],
-        'PMunl' : sns.xkcd_rgb['barney'],
-        'PMlab' : sns.xkcd_rgb['red'],
-        'V1_UNL': sns.xkcd_rgb['seaweed'],
-        'V1_LAB' : sns.xkcd_rgb['rose'],
-        'PM_UNL' : sns.xkcd_rgb['barney'],
-        'PM_LAB' : sns.xkcd_rgb['red'],
+    palette       = {
+        'V1unl': '#00CC99',
+        'V1lab' : '#006149',
+        'PMunl' : '#9933FF',
+        'PMlab' : '#4C0099',
+        'V1_UNL': '#00CC99',
+        'V1_LAB' :  '#006149',
+        'PM_UNL' :  '#9933FF',
+        'PM_LAB' :  '#4C0099',
         'ALunl': sns.xkcd_rgb['clear blue'],
         'ALlab' : sns.xkcd_rgb['burnt orange'],
         'RSPunl' : sns.xkcd_rgb['sienna'],

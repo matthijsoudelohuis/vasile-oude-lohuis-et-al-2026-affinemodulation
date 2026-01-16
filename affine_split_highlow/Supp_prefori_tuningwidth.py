@@ -155,7 +155,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing preferred orie
                 #                            p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0],
                 #                            bounds=([0,0,0,0,0],[np.inf,np.inf,2*math.pi,np.inf,np.inf]))
                 
-                
                 VM_data_ses[iN,:,0] = popt_low
                 popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,0],p0=[1,1,xdata[np.argmax(meanresp_shuf[iN,:,0])],0.25,0])
                 VM_data_ses_shuffled[iN,:,0] = popt_low_shuf
