@@ -10,6 +10,7 @@ from sklearn.preprocessing import minmax_scale
 from sklearn.metrics import r2_score
 from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr,ks_2samp
 from scipy import stats
+from statsmodels.formula.api import ols
 
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
@@ -74,9 +75,9 @@ clrs_area_labeled = get_clr_area_labeled(arealabels)
 pref_oris_unl = celldata.loc[celldata['arealabel']==arealabels[0],'pref_ori']
 pref_oris_lab = celldata.loc[celldata['arealabel']==arealabels[1],'pref_ori']
 ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[0],label=lab,alpha=1)
+    histtype='step',color=clrs_area_labeled[0],label=arealabels[0],alpha=1)
 ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[1],label=lab,alpha=1)
+    histtype='step',color=clrs_area_labeled[1],label=arealabels[1],alpha=1)
 leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
 
 stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
@@ -87,8 +88,7 @@ for lh in leg.legend_handles:
 for text, color in zip(leg.texts, get_clr_area_labeled(arealabels)):
     text.set_color(color)
 ax.set_xlabel('Pref. direction (deg)')
-if iarea == 0: 
-    ax.set_ylabel('Density (a.u.)')
+ax.set_ylabel('Density (a.u.)')
 ax.set_xticks(np.arange(0,360,45))
 ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
 ax.set_title('V1',color=clrs_area_labeled[0],fontsize=9)
@@ -103,9 +103,9 @@ stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
 ax.text(0.5, 0.05, 'KS-test (%1.2f),p=%1.2f' % (stat,pval), horizontalalignment='center',
         transform=ax.transAxes,fontsize=6)
 ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[0],label=lab,alpha=1)
+    histtype='step',color=clrs_area_labeled[0],label=arealabels[0],alpha=1)
 ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[1],label=lab,alpha=1)
+    histtype='step',color=clrs_area_labeled[1],label=arealabels[1],alpha=1)
 leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
 for lh in leg.legend_handles:
     lh.set_visible(False)
@@ -209,14 +209,12 @@ for ises in range(nSessions):
     for ial,alp in enumerate(arealabelpairs):
         nsampleneurons = np.min([nsampleneurons,
                                  len(np.where(np.all((sessions[ises].celldata['arealabel'] == alp,
-                                                      sessions[ises].celldata['noise_level']<maxnoiselevel,
+                                                    #   sessions[ises].celldata['noise_level']<maxnoiselevel,
                                                       sessions[ises].celldata['nearby'],
                                                       ),axis=0))[0])])
     
     for ial,alp in enumerate(arealabelpairs):
         idx_N               = np.where(np.all((sessions[ises].celldata['arealabel'] == alp,),axis=0))[0]
-        idx_N               = np.where(np.all((sessions[ises].celldata['arealabel'] == alp,
-                                            sessions[ises].celldata['noise_level']<maxnoiselevel),axis=0))[0]
         idx_N               = np.random.choice(idx_N, size=nsampleneurons, replace=False)
         datamat[ial,:]      = np.nanmean(sessions[ises].respmat[np.ix_(idx_N,idx_T_still)],axis=0)
     corrmat[:,:,ises] = np.corrcoef(datamat)
@@ -243,7 +241,7 @@ arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
 
 vscale      = 0.015
 
-fig,axes = plt.subplots(2,1,figsize=(3.5,6))
+fig,axes = plt.subplots(2,1,figsize=(5*cm,8*cm))
 for ialp,alp in enumerate(arealabelpairs):
     respdata        = sessions[ises].respmat
 
@@ -277,12 +275,14 @@ for ialp,alp in enumerate(arealabelpairs):
     ax.plot([-1,1],[-1,1],color='k',linewidth=0.2)
     ax.set_xlim(np.percentile([meanpopact_N2,meanpopact_N1],[0.1,99.5]))
     ax.set_ylim(np.percentile([meanpopact_N2,meanpopact_N1],[0.1,99.5]))
-    ax.set_xlabel('Mean %s activity (events/F0) ' % arealabeled_to_figlabels([alp.split('-')[1]]))
-    ax.set_ylabel('Mean %s activity (events/F0) ' % arealabeled_to_figlabels([alp.split('-')[0]]))
+    # ax.set_xlim([0,np.percentile([meanpopact_N2,meanpopact_N1],[99.5])])
+    # ax.set_ylim([0,np.percentile([meanpopact_N2,meanpopact_N1],[99.5])])  
+    ax.set_xlabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[1]]))
+    ax.set_ylabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[0]]))
     ax_nticks(ax, 3)
     plt.tight_layout()
     sns.despine(fig=fig, top=True, right=True,offset=1)
-my_savefig(fig,savedir,'Diff_LabUnl_%s' % sessiondata['session_id'][ises])
+# my_savefig(fig,savedir,'Diff_LabUnl_%s' % sessiondata['session_id'][ises])
 
 #%% Show the distribution of mean activity of the labeled population and the selection of the
 arealabelpairs  = ['V1lab','PMlab']
@@ -364,7 +364,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+    idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
 
     # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
@@ -493,8 +493,8 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-# nboots                  = 0
-nboots                  = 250
+nboots                  = 0
+# nboots                  = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
@@ -509,7 +509,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
     # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
                                 # sessions[ises].respmat_runspeed < maxrunspeed)
-    idx_T = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+    idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
     
     for ialp,alp in enumerate(arealabelpairs):
@@ -1034,7 +1034,7 @@ for iparam in range(2):
     handles = []
     for ialp,alp in enumerate(arealabelpairs):
         
-        idx_N =  rangeresp>params['minrangeresp']
+        # idx_N =  rangeresp>params['minrangeresp']
         # idx_N =  sig_params_regress[:,ialp,1]==1
         idx_N = np.all((
                 rangeresp>params['minrangeresp'],
@@ -1234,41 +1234,81 @@ my_savefig(fig,savedir,'FF_FB_Modulation_vs_Activity_%dGRsessions' % (nSessions)
 # just dependent on a difference in activity levels?
 # Is modulation more multiplicative for larger activity levels, stimuli with 
 mincounts = 20
+nbins = 15
+ylims = [[-0.2,2],[-0.01,0.05]]
 
-vartocontrol = 'gOSI'
-# vartocontrol = 'rangeresp'
-# vartocontrol = 'meanact'
-bins = np.linspace(celldata[vartocontrol].min(),np.nanpercentile(celldata[vartocontrol],99),20)
-fig,axes = plt.subplots(2,2,figsize=(5,5),sharex='row',sharey='row')
-for ivar,var in enumerate(['slope','offset']):
-    for ialp,alp in enumerate(arealabelpairs):
-        ax = axes[ivar,0]
+varstocontrol = ['gOSI','rangeresp','meanact']
+ylabels = ['gOSI','response range','mean activity']
 
-        idx_N = celldata['arealayerlabel'] == alp.split('-')[2]
-        xdata = celldata[vartocontrol][idx_N]
-        ydata = celldata[var][idx_N]
+# fig,axes = plt.subplots(1,2*len(varstocontrol),figsize=(len(varstocontrol)*3.5*2*cm,3.5*cm),sharex=False,sharey=False)
+fig,axes = plt.subplots(1,2*len(varstocontrol),figsize=(len(varstocontrol)*3.5*2*cm,3.5*cm),sharex=False,sharey=False)
 
-        idx_notnan = np.logical_and(~np.isnan(xdata),~np.isnan(ydata))
-        xdata = xdata[idx_notnan]
-        ydata = ydata[idx_notnan]
+for ivartocontrol,vartocontrol in enumerate(varstocontrol):
+    for ivar,var in enumerate(['slope','offset']):
+        df = pd.DataFrame({'controlvar':[],'vardata':[],'arealabel':[]})
+        for ialp,alp in enumerate(arealabelpairs):
+            ax = axes[ivartocontrol*2+ivar]
 
-        ax.set_xlim(np.percentile(bins,[0,100]))
-        ax.scatter(xdata,ydata,s=3,alpha=0.2,color=clrs_arealabelpairs[ialp])
-        ax.set_xlabel(vartocontrol)
-        ax.set_ylabel(var)
+            # idx_N = celldata['arealayerlabel'] == alp.split('-')[2]
 
-        ax = axes[ivar,1]
-        ymeandata,bin_edges = binned_statistic(xdata, ydata, statistic='mean', 
-                                bins=bins)[:2]
-        bincounts = np.histogram(xdata,bins=bin_edges)[0]
-        ymeandata[bincounts<mincounts] = np.nan
-        ax.plot(bin_edges[:-1],ymeandata,color=clrs_arealabelpairs[ialp],
-                linewidth=2)
-        ax.set_ylim(np.nanpercentile(ydata,[1,99]))
-        ax.set_xlim(np.nanpercentile(bins,[0,100]))
+            idx_N = np.all((
+                    celldata['arealayerlabel'] == alp.split('-')[2],
+                    rangeresp>params['minrangeresp'],
+                    np.any(corrsig_cells==1,axis=0),
+                    ),axis=0)
+            
+            bins = np.linspace(celldata[vartocontrol][idx_N].min(),np.nanpercentile(celldata[vartocontrol][idx_N],99),nbins)
+            bincenters = (bins[1:]+bins[:-1])/2
+
+            xdata = celldata[vartocontrol][idx_N]
+            ydata = celldata[var][idx_N]
+
+            idx_notnan = np.logical_and(~np.isnan(xdata),~np.isnan(ydata))
+            xdata = xdata[idx_notnan]
+            ydata = ydata[idx_notnan]
+            df = pd.concat((df,pd.DataFrame({'controlvar':xdata,'vardata':ydata,'arealabel':ialp})))
+
+            # h,p = stats.ttest_ind(params_regress[idx_N,0,iparam],
+                            # params_regress[idx_N,1,iparam],nan_policy='omit')
+            # p = np.clip(p * narealabelpairs * 2,0,1) #bonferroni + clip
+
+            # ax = axes[ivar,0]
+            ymeandata,_ = binned_statistic(xdata, ydata, statistic='mean', 
+                                    bins=bins)[:2]
+           
+            bincounts = np.histogram(xdata,bins=bins)[0]
+            yerror,_ = binned_statistic(xdata, ydata, statistic='std', 
+                                    bins=bins)[:2]
+            yerror /= np.sqrt(bincounts)
+
+            ymeandata[bincounts<mincounts] = np.nan
+            yerror[bincounts<mincounts] = np.nan
+            # ax.plot(bin_edges[:-1],ymeandata,color=clrs_arealabelpairs[ialp],
+                    # linewidth=2)
+            shaded_error(bincenters,ymeandata,yerror,ax=ax,color=clrs_arealabelpairs[ialp])
+            bincenters = bincenters[bincounts>=mincounts]
+            # ax.scatter(xdata,ydata,s=0.5,alpha=0.5,color=clrs_arealabelpairs[ialp])
+            ax.set_xlabel(ylabels[ivartocontrol])
+            # ax.set_ylabel(var)
+            ax.set_title(var,fontsize=8)
+            ax.set_ylim(ylims[ivar])
+            ax.set_xlim(bincenters[0],bincenters[-1])
+        # df.dropna(inplace=True)
+
+        # Perform the ANCOVA
+        model = ols('vardata ~ arealabel + controlvar', data=df,hasconst=False).fit()
+        # model = ols('vardata ~ arealabel', data=df).fit()
+        # results = ols('vardata ~ arealabel + controlvar', data=df,hasconst=False).fit()
+        # Print the summary of the model
+        summary_table = model.summary().tables[0]
+        # print(f"F={statistic}, p={p_value}")  # print(f"t-statistic: {statistic}")        # # Print the F-test statistic and P-value
+        # Print the summary of the model
+        summary_table = model.summary().tables[1]
+        # print(summary_table)
+        print('%s, %s: t=%1.1f, p=%1.2e' % (ylabels[ivartocontrol],var,model.tvalues[1],model.pvalues[1]))
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Control_AffineCoefs_%s_%dGRsessions' % (vartocontrol,nSessions), formats = ['png'])
+my_savefig(fig,savedir,'ControlVars_AffineCoefs_%dGRsessions' % (nSessions))
 
 #%% Is there a difference in the distribution of activity across the stimuli across the areas:
 fig,axes = plt.subplots(1,2,figsize=(6,3),sharex=False,sharey=True)

@@ -15,7 +15,7 @@ from pylab import *
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.get_data_folder import get_local_drive
-
+from params import load_params
 from utils.explorefigs import plot_PCA_gratings_3D,plot_PCA_gratings
 from loaddata.session_info import *
 from utils.tuning import compute_tuning_wrapper
@@ -25,6 +25,11 @@ from utils.plot_lib import * #get all the fixed color schemes
 from utils.RRRlib import regress_out_behavior_modulation
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\TrialwiseModel\\')
+
+#%% Plotting and parameters:
+params  = load_params()
+set_plot_basic_config()
+cm      = 1/2.54  # centimeters in inches
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
@@ -38,31 +43,21 @@ sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset
 sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
 
 #%%  Load data properly:
-calciumversion = 'deconv'
 for ises in range(nSessions):
-    sessions[ises].load_respmat(load_behaviordata=True, load_calciumdata=True,load_videodata=True,
-                                calciumversion=calciumversion,keepraw=False)
+    sessions[ises].load_respmat(calciumversion=params['calciumversion'])
+    # sessions[ises].respmat  /= sessions[ises].celldata['meanF'].to_numpy()[:,None] #convert to deconv/F0
 
 #%%
-sessions = compute_tuning_wrapper(sessions)
+# sessions = compute_tuning_wrapper(sessions)
 
 #%%
 for ises in range(nSessions):   
     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
     sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=50)
 
-
-#%%  #assign arealayerlabel
-for ises in range(nSessions):   
-    # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
-    sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
-    sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
-    sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
-
 #%% Concatenate all cells:
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 nCells                  = len(celldata)
-
 
 #%%
 def fit_affine_FFFB(y,X,S,kfold=5,subtract_shuffle=True):
@@ -168,28 +163,35 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing affine modulat
     for ialp,alp in enumerate(arealabelpairs):
         # idx_source_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
         # idx_source_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
-        idx_source_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                                    # sessions[ises].celldata['nearby']
-                                                    ),axis=0))[0]
-        idx_source_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                                    sessions[ises].celldata['noise_level']<maxnoiselevel,
-                                                    # sessions[ises].celldata['nearby']
-                                                    ),axis=0))[0]
+        
+        idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
+        
+        idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
 
-        subsampleneurons = np.min([idx_source_N1.shape[0],idx_source_N2.shape[0]])
-        idx_source_N1 = np.random.choice(idx_source_N1,subsampleneurons,replace=False)
-        idx_source_N2 = np.random.choice(idx_source_N2,subsampleneurons,replace=False)
+        idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
-        idx_target              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
+        # idx_source_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
+        #                                             sessions[ises].celldata['noise_level']<maxnoiselevel,
+        #                                             # sessions[ises].celldata['nearby']
+        #                                             ),axis=0))[0]
+        # idx_source_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
+        #                                             sessions[ises].celldata['noise_level']<maxnoiselevel,
+        #                                             # sessions[ises].celldata['nearby']
+        #                                             ),axis=0))[0]
 
-        if len(idx_source_N1) < minnneurons or len(idx_source_N2) < minnneurons:
+        # subsampleneurons = np.min([idx_source_N1.shape[0],idx_source_N2.shape[0]])
+        # idx_source_N1 = np.random.choice(idx_source_N1,subsampleneurons,replace=False)
+        # idx_source_N2 = np.random.choice(idx_source_N2,subsampleneurons,replace=False)
+
+        # idx_target              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
+
+        if len(idx_N1) < minnneurons or len(idx_N2) < minnneurons:
             continue
         
-        meanpopact_N1          = np.nanmean(respdata[idx_source_N1,:],axis=0)
-        meanpopact_N2          = np.nanmean(respdata[idx_source_N2,:],axis=0)
+        meanpopact_N1          = np.nanmean(respdata[idx_N1,:],axis=0)
+        meanpopact_N2          = np.nanmean(respdata[idx_N2,:],axis=0)
 
-        for iN,N in enumerate(idx_target):
+        for iN,N in enumerate(idx_N3):
             y       = respdata[N,:] 
             # X       = np.column_stack((X_p,meanpopact_N1,meanpopact_N2))
             # X       = np.column_stack((X_p,meanpopact_N1))

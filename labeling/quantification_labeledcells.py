@@ -78,7 +78,7 @@ planedata['frac_responsive']  = celldata.groupby(["session_id","plane_idx"])['re
 #%% 
 
 #%% ####### Show histogram of ROI overlaps: #######################
-fig, (ax1,ax2) = plt.subplots(2,1,figsize=(3.5,3),sharex=True)
+fig, (ax1,ax2) = plt.subplots(2,1,figsize=(6*cm,5*cm),sharex=True)
 
 sns.histplot(data=celldata,x='frac_red_in_ROI',stat='probability',hue='redcell',
              palette=get_clr_labeled(),binwidth=0.05,ax=ax1)
@@ -87,24 +87,25 @@ sns.histplot(data=celldata,x='frac_red_in_ROI',stat='probability',hue='redcell',
              palette=get_clr_labeled(),binwidth=0.05,ax=ax2)
 fig.subplots_adjust(hspace=0.05)
 
+ax1.get_legend().remove()
 ax2.get_legend().remove()
 
 ax1.set_xlim([0,1])
 ax1.set_ylim([0.8,1])
-ax2.set_ylim([0,0.02])
+ax2.set_ylim([0,0.03])
 
 ax1.axvline(threshold,color='grey',linestyle=':')
 ax2.axvline(threshold,color='grey',linestyle=':')
 
-ax1.set_xlabel('ROI Overlap')
-ax1.set_ylabel('Fraction of cells')
-ax2.set_ylabel('')
-plt.tight_layout()
 ax1.spines.bottom.set_visible(False)
 ax2.spines.top.set_visible(False)
 ax1.xaxis.tick_top()
 ax1.tick_params(labeltop=False)
 ax2.xaxis.tick_bottom()
+
+ax2.set_xlabel('ROI Overlap',fontsize=7,labelpad=1)
+ax1.set_ylabel('Fraction of cells',fontsize=7,labelpad=1)
+ax2.set_ylabel('')
 
 d = 0.5
 kwargs = dict(marker=[(-1,-d),(1,d)],markersize=12,linestyle="none",color='k',mec='k',mew=1,clip_on=False)
@@ -112,7 +113,7 @@ ax1.plot([0,1],[0,0],transform=ax1.transAxes,**kwargs)
 ax2.plot([0,1],[1,1],transform=ax2.transAxes,**kwargs)
 
 plt.tight_layout()
-# plt.savefig(os.path.join(savedir,'Overlap_Dist_%dcells_%dsessions' % (len(celldata),nsessions) + '.png'), format = 'png')
+my_savefig(fig,savedir,'Overlap_Dist_%dcells_%dsessions' % (len(celldata),nsessions))
 
 #%% ####### Show scatter of the two overlap metrics: frac red in ROI and frac of ROI red #######################
 fig, ax = plt.subplots(figsize=(3.5,3))
@@ -233,20 +234,22 @@ plt.tight_layout()
 #%% Bar plot of difference between cre and flp:
 enzymes = ['cre','flp']
 clrs_enzymes = get_clr_recombinase(enzymes)
+clrs_enzymes = [sns.xkcd_rgb['orangered'],sns.xkcd_rgb['clear blue']]
+
 enzymelabels = ['retroAAV-pgk-Cre + \n AAV5-CAG-Flex-tdTomato','retroAAV-EF1a-Flpo + \n AAV1-Ef1a-fDIO-tdTomato']
+# enzymelabels = ['retroAAV-pgk-Cre + \n AAV5-CAG-Flex-tdTomato','retroAAV-EF1a-Flpo + \n AAV1-Ef1a-fDIO-tdTomato']
+enzymelabels = ['cre','flp']
 
-fig, ax = plt.subplots(figsize=(3,3))
+fig, ax = plt.subplots(figsize=(5*cm,4*cm))
 sns.barplot(data=planedata,x='recombinase',y='frac_labeled',palette=clrs_enzymes,ax=ax,errorbar='se')
-plt.ylabel('Frac. labeled\n (per plane)')
-plt.xlabel(r'Recombinase')
+ax.set_ylabel('Frac. labeled\n (per plane)')
+ax.set_xlabel(r'Recombinase')
 ax.set_xticks([0,1])
-ax.set_xticklabels(['\n\nCre','\n\nFlp'], fontsize=8)
-ax.set_xticks([0.01,1.01],  minor=True)
-ax.set_xticklabels(enzymelabels,fontsize=6, minor=True)
-
-# ax.set_xticklabels(enzymelabels,fontsize=6)
+ax.set_xticklabels(enzymelabels,fontsize=6)
+ax_nticks(ax,3)
 plt.tight_layout()
-plt.savefig(os.path.join(savedir,'Frac_labeled_enzymes_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
+# plt.savefig(os.path.join(savedir,'Frac_labeled_enzymes_%dplanes' % len(planedata) + '.png'), format = 'png',bbox_inches='tight')
+my_savefig(fig,savedir,'Frac_labeled_enzymes_%dplanes' % len(planedata))
 
 #%% Scatter plot as a function of depth:
 fig, ax = plt.subplots(figsize=(5,4))
