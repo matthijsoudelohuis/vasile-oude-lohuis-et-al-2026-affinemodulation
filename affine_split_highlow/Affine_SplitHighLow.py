@@ -482,7 +482,7 @@ nCells                  = len(celldata)
 oris                    = np.sort(sessions[0].trialdata['Orientation'].unique())
 
 #criteria for selecting still trials:
-maxvideome              = 0.2
+# maxvideome              = 0.2
 # maxrunspeed             = 5
 alphathr                = 0.001 #threshold for correlation with cross area rate
 
