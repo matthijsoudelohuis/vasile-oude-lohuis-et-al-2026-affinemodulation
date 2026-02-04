@@ -23,19 +23,17 @@ savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF
 params  = load_params()
 set_plot_basic_config()
 cm      = 1/2.54  # centimeters in inches
-params['minrangeresp'] = 0.05
-params['alpha_crossrate'] = 0.0001
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
 session_list            = np.array([['LPE12223_2024_06_10']])
 session_list            = np.array([['LPE11086_2024_01_05','LPE12223_2024_06_10']])
 
-sessions,nSessions      = filter_sessions(protocols = ['GR'],only_session_id=session_list)
+sessions,nSessions      = filter_sessions(protocols = ['SP'],only_session_id=session_list)
 sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 
 #%% Load all GR sessions: 
-sessions,nSessions   = filter_sessions(protocols = 'GR')
+sessions,nSessions   = filter_sessions(protocols = 'SP')
 # sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
 sessiondata          = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 
@@ -64,26 +62,32 @@ for ises in range(nSessions):
             fracnonlooped[ialp,iradius,ises] = np.sum(sessions[ises].celldata['nearby'][idx_N]) / np.sum(idx_N)
 
 #%% Show the fraction of nonlooped neurons within a radius from looped cells:
-fig,ax = plt.subplots(1,1,figsize=(5*cm,5*cm),sharex=True,sharey=True)
+fig,ax = plt.subplots(1,1,figsize=(3,3),sharex=True,sharey=True)
 for ialp,alp in enumerate(arealabelpairs):
+    # ax.scatter(radii, np.nanmean(fracnonlooped[ialp,:,:],axis=1), marker='o', color=clrs_arealabelpairs[ialp])
+    # ax.plot(radii,np.nanmean(error_cv[:,ialp,:,:],axis=(2)),color=clrs_arealabelpairs[ialp], linewidth=0.5)
     shaded_error(radii,fracnonlooped[ialp,:,:].T,center='mean',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
+    # shaded_error(radii,fracnonlooped[ialp,:,:].T,center='median',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
+    # ax.plot(radii,fracnonlooped[ialp,:,:],color=clrs_arealabelpairs[ialp])
     ax.set_ylim([0,1])
-    ax.set_yticks([0,0.5,1])
-    ax.set_xticks(np.arange(0,400,100))
+    # ax.set_xlim([0,popsizes[-1]+1])
+    # ax.set_xticks(radii)
+    ax.set_xticks(np.arange(0,400,50))
     ax.set_xlabel('Min dist to looped cell (um)')
     if ialp == 0: 
         ax.set_ylabel('Fraction nonlooped cells')
+    # ax.set_title(legendlabels[ialp],fontsize=12)
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Fraction_nonlooped_distance_V1PM_%dsessions' % nSessions)
+# my_savefig(fig,savedir,'Fraction_nonlooped_distance_V1PM_%dsessions' % nSessions)
 
 #%% Compute the fraction of looped neurons with at least one neighbour within a radius:
 arealabelpairs      = ['PMlabL2/3','V1labL2/3']
 narealabelpairs     = len(arealabelpairs)
 legendlabels        = ['PM','V1']
 
-radii               = np.arange(0,75,3)
+radii               = np.arange(0,100,5)
 fraclooped          = np.zeros((narealabelpairs,len(radii),nSessions))
 
 for ises in range(nSessions):
@@ -94,20 +98,28 @@ for ises in range(nSessions):
             idx_nearby = np.any(sessions[ises].distmat_xyz[np.ix_(idx_N,idx_L)]<radius,axis=1)
             fraclooped[ialp,iradius,ises] = np.sum(idx_nearby) / np.sum(idx_N)
 
-#%% Show the fraction of looped neurons that have at least  a radius from looped cells:
-fig,ax = plt.subplots(1,1,figsize=(5*cm,5*cm),sharex=True,sharey=True)
+
+#%% Show the fraction of nonlooped neurons within a radius from looped cells:
+fig,ax = plt.subplots(1,1,figsize=(3,3),sharex=True,sharey=True)
 for ialp,alp in enumerate(arealabelpairs):
+    # ax.scatter(radii, np.nanmean(fracnonlooped[ialp,:,:],axis=1), marker='o', color=clrs_arealabelpairs[ialp])
+    # ax.plot(radii,np.nanmean(error_cv[:,ialp,:,:],axis=(2)),color=clrs_arealabelpairs[ialp], linewidth=0.5)
     shaded_error(radii,fraclooped[ialp,:,:].T,center='mean',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
+    # shaded_error(radii,fracnonlooped[ialp,:,:].T,center='median',error='sem',color=clrs_arealabelpairs[ialp],ax=ax)
+    ax.plot(radii,fracnonlooped[ialp,:,:],color=clrs_arealabelpairs[ialp])
     ax.set_ylim([0,1])
-    ax.set_yticks([0,0.5,1])
-    ax.set_xticks(np.arange(0,radii[-1]+10,25))
+    # ax.set_xlim([0,popsizes[-1]+1])
+    # ax.set_xticks(radii)
+    ax.set_xticks(radii[::2])
     ax.set_xlabel('Min dist to looped cell (um)')
     if ialp == 0: 
         ax.set_ylabel('Fraction looped cells included')
+    # ax.set_title(legendlabels[ialp],fontsize=12)
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Fraction_looped_distance_V1PM_%dsessions' % nSessions)
+# my_savefig(fig,savedir,'Fraction_nonlooped_distance_V1PM_%dsessions' % nSessions)
+
 
 #%%
 # without subsampling to equalize numbers of neruons
@@ -115,6 +127,13 @@ my_savefig(fig,savedir,'Fraction_looped_distance_V1PM_%dsessions' % nSessions)
 # nearby neurons only, <50 um
 # maxnoiselevel=20
 # minneurons=10
+
+# #%%  #assign arealayerlabel
+# for ises in range(nSessions):   
+#     # sessions[ises].celldata = assign_layer(sessions[ises].celldata)
+#     sessions[ises].celldata = assign_layer2(sessions[ises].celldata,splitdepth=275)
+#     sessions[ises].celldata['arealayerlabel']   = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
+#     sessions[ises].celldata['arealayer']        = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
 
 #%%
 for ises in range(nSessions):   
@@ -136,6 +155,13 @@ nOris                   = 16
 nCells                  = len(celldata)
 oris                    = np.sort(sessions[0].trialdata['Orientation'].unique())
 
+#criteria for selecting still trials:
+# maxvideome              = 0.2
+# maxrunspeed             = 5
+# alphathr                = 0.001 #threshold for correlation with cross area rate
+params['alpha_crossrate'] = 0.0001
+params['activitymetric'] = 'difference' #'mean','ratio','difference'
+minnneurons             = 10
 mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
@@ -173,7 +199,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
-        if len(idx_N1) < params['minnneurons'] or len(idx_N2) < params['minnneurons'] or len(idx_N3) < params['minnneurons']:
+        if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
             continue
                 
         if params['activitymetric'] == 'mean':#Just mean activity:
@@ -251,17 +277,64 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
         tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
+        # tempcorr          = np.array([ranksums(meanpopact,respdata[n,:])[0] for n in idx_N3])
         tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
-
+        # tempsig          = np.array([ranksums(meanpopact,respdata[n,:])[1] for n in idx_N3])
+        
         corrdata_cells[ialp,idx_ses] = tempcorr
-        tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
+
+        from statsmodels.stats.multitest import multipletests
+        _,tempsig,_,_ = multipletests(tempsig, alpha=0.05, method='holm', maxiter=1, is_sorted=False, returnsorted=False)
+        tempsig = (tempsig<0.05) * np.sign(tempcorr)
+        
+        # tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
 
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
+#%% Show some example neurons:
+
+# #%% use 
+# ialp = 0
+# clrs_arealabelpairs = ['green','purple']
+# legendlabels        = ['FF','FB']
+
+# #%% Get good multiplicatively modulated cells by FF or FB:
+# #mutliplicative: 
+# idx_examples = np.all((params_regress[:,ialp,0]>np.nanpercentile(params_regress[:,ialp,0],80),
+#                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
+#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
+#                        ),axis=0)
+# #divisive:
+# idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
+#                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
+#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
+#                        ),axis=0)
+
+# print(celldata['cell_id'][idx_examples])
+
+# example_cell      = np.random.choice(celldata['cell_id'][idx_examples])
+# example_cells     = np.random.choice(celldata['cell_id'][idx_examples],2)
+
+# #%% Get good additively modulated cells by FB: 
+# #additive:
+# idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],80),
+#                        params_regress[:,ialp,1]>np.nanpercentile(params_regress[:,ialp,1],70),
+#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
+#                        ),axis=0)
+# # #subtractive:
+# # idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],70),
+# #                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],25),
+# #                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
+# #                        ),axis=0)
+# print(celldata['cell_id'][idx_examples])
+
+# example_cell      = np.random.choice(celldata['cell_id'][idx_examples])
+
 #%% 
+
 ######  ####### ####### #######    ######     #    ######  ### #     #  #####  
 #     # #     # #     #    #       #     #   # #   #     #  #  #     # #     # 
 #     # #     # #     #    #       #     #  #   #  #     #  #  #     # #       
@@ -269,6 +342,21 @@ rangeresp = np.nanmax(rangeresp,axis=(0,1))
 #     # #     # #     #    #       #   #   ####### #     #  #  #     #       # 
 #     # #     # #     #    #       #    #  #     # #     #  #  #     # #     # 
 ######  ####### #######    #       #     # #     # ######  ###  #####   #####  
+
+
+#%% 
+# for ises in range(nSessions):
+#     sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'],metric='xyz')
+#     # sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'],metric='xy')
+# celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
+
+# # #%%  #assign arealayerlabel
+# for ises in range(nSessions):   
+#     sessions[ises].celldata = sessions[ises].assign_layer2(splitdepth=275)
+#     # sessions[ises].celldata = sessions[ises].assign_layer()
+#     sessions[ises].celldata['arealayerlabel'] = sessions[ises].celldata['arealabel'] + sessions[ises].celldata['layer'] 
+#     sessions[ises].celldata['arealayer'] = sessions[ises].celldata['roi_name'] + sessions[ises].celldata['layer'] 
+# celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
 #%%
 # from utils.tuning import comp_grating_responsive
@@ -286,67 +374,72 @@ idx_V1lab       = np.where(celldata['arealayerlabel'] == 'V1labL2/3')[0]
 
 idx_PMlab       = np.where(np.all((
                                     celldata['arealayerlabel'] == 'PMlabL2/3',
-                                    rangeresp>=params['minrangeresp'],
+                                    rangeresp>params['minrangeresp'],
                                     # celldata['noise_level']<params['maxnoiselevel'],
                                     ),axis=0))[0]
 idx_V1lab       = np.where(np.all((
                                     celldata['arealayerlabel'] == 'V1labL2/3',
-                                    rangeresp>=params['minrangeresp'],
+                                    rangeresp>params['minrangeresp'],
                                     # celldata['noise_level']<params['maxnoiselevel'],
                                     ),axis=0))[0]
 nPMlab          = len(idx_PMlab)
 nV1lab          = len(idx_V1lab)
-idx_PMlab_allnear  = np.full((nPMlab,2,1000),np.nan) #store all unlabeled cell indices within radius
-idx_V1lab_allnear  = np.full((nV1lab,2,1000),np.nan)
-distancemetric = 'xyz' #or 'xy'
+idx_PMlab_allnear  = np.full((nPMlab,2,200),np.nan) #store up to 100 nearby nonlabeled cells for each labeled cell, get idx and distance
+idx_V1lab_allnear  = np.full((nV1lab,2,200),np.nan)
 
 for iN,N in tqdm(enumerate(idx_PMlab),total=nPMlab,desc='Finding PM neurons nearby labeled cells'):
     #get index of which session this labeled cell comes from:
     ises        = np.where(np.isin(sessiondata['session_id'],celldata['session_id'][N]))[0][0] 
-    if distancemetric == 'xyz': 
-        distmat = sessions[ises].distmat_xyz
-    elif distancemetric == 'xy':
-        distmat = sessions[ises].distmat_xy
     #get index of all cells in this session
     idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
     #get index of labeled cell in this session
     idx_N_ses   = np.where(np.isin(sessions[ises].celldata['cell_id'],celldata['cell_id'][N]))[0]
     #get index of all unlabeled cells in this session that are nearby this particular labeled cell
     idx_nearby_ses = np.where(np.all((
-                                        np.squeeze(distmat[idx_N_ses,:]<np.max(radii)),
-                                        rangeresp[idx_ses]>=params['minrangeresp'],
+                                        np.squeeze(sessions[ises].distmat_xyz[idx_N_ses,:]<np.max(radii)),
+                                        # np.squeeze(sessions[ises].distmat_xy[idx_N_ses,:]<np.max(radii)),
+                                        rangeresp[idx_ses]>params['minrangeresp'],
                                         # sessions[ises].celldata['noise_level']<params['maxnoiselevel'],
+                                        # sessions[ises].celldata['redcell']==0,
                                         # sessions[ises].celldata['arealayerlabel'] == 'PMunlL2/3',
                                         ),axis=0))[0]
     
-    # idx_nearby_ses = idx_nearby_ses[:200] #take first 200 closest nearby cells (is all of them actually)
+    # tempdist = sessions[ises].distmat_xyz[np.ix_(idx_N_ses,idx_nearby_ses)].squeeze()
+    # sortidx = np.argsort(tempdist)
+    # print(len(idx_nearby_ses))
+    # tempdist = tempdist[sortidx]
+    # idx_nearby_ses = idx_nearby_ses[sortidx] #sort by distance
+    idx_nearby_ses = idx_nearby_ses[:200] #take first 200 closest nearby cells (is all of them actually)
     idx_nearby_all = np.where(np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_nearby_ses]))[0]
     idx_PMlab_allnear[iN,0,:len(idx_nearby_ses)] = idx_nearby_all
-    idx_PMlab_allnear[iN,1,:len(idx_nearby_ses)] = distmat[np.ix_(idx_N_ses,idx_nearby_ses)]
+    idx_PMlab_allnear[iN,1,:len(idx_nearby_ses)] = sessions[ises].distmat_xyz[np.ix_(idx_N_ses,idx_nearby_ses)]
+    # idx_PMlab_allnear[iN,1,:len(idx_nearby_ses)] = sessions[ises].distmat_xy[np.ix_(idx_N_ses,idx_nearby_ses)]
 
 for iN,N in tqdm(enumerate(idx_V1lab),total=nV1lab,desc='Finding V1 neurons nearby labeled cells'):
     #get index of which session this labeled cell comes from:
     ises        = np.where(np.isin(sessiondata['session_id'],celldata['session_id'][N]))[0][0] 
-    if distancemetric == 'xyz': 
-        distmat = sessions[ises].distmat_xyz
-    elif distancemetric == 'xy':
-        distmat = sessions[ises].distmat_xy
     #get index of all cells in this session
     idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
     #get index of labeled cell in this session
     idx_N_ses   = np.where(np.isin(sessions[ises].celldata['cell_id'],celldata['cell_id'][N]))[0]
     #get index of all unlabeled cells in this session that are nearby this particular labeled cell
     idx_nearby_ses = np.where(np.all((
-                                        np.squeeze(distmat[idx_N_ses,:]<np.max(radii)),
-                                        rangeresp[idx_ses]>=params['minrangeresp'],
+                                        np.squeeze(sessions[ises].distmat_xyz[idx_N_ses,:]<np.max(radii)),
+                                        # np.squeeze(sessions[ises].distmat_xy[idx_N_ses,:]<np.max(radii)),
+                                        rangeresp[idx_ses]>params['minrangeresp'],
+                                        # sessions[ises].celldata['redcell']==0,
                                         # sessions[ises].celldata['arealayerlabel'] == 'V1unlL2/3',
                                         # sessions[ises].celldata['noise_level']<params['maxnoiselevel'],
                                         ),axis=0))[0]
-    # idx_nearby_ses = idx_nearby_ses[:200] #limit to first 100 nearby cells
+    # tempdist = sessions[ises].distmat_xyz[np.ix_(idx_N_ses,idx_nearby_ses)].squeeze()
+    # sortidx = np.argsort(tempdist)
+    # tempdist = tempdist[sortidx]
+    # idx_nearby_ses = idx_nearby_ses[sortidx] #sort by distance
+    idx_nearby_ses = idx_nearby_ses[:200] #limit to first 100 nearby cells
     idx_nearby_all = np.where(np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_nearby_ses]))[0]
     idx_V1lab_allnear[iN,0,:len(idx_nearby_ses)] = idx_nearby_all
-    idx_V1lab_allnear[iN,1,:len(idx_nearby_ses)] = distmat[np.ix_(idx_N_ses,idx_nearby_ses)]
-
+    idx_V1lab_allnear[iN,1,:len(idx_nearby_ses)] = sessions[ises].distmat_xyz[np.ix_(idx_N_ses,idx_nearby_ses)]
+    # idx_V1lab_allnear[iN,1,:len(idx_nearby_ses)] = sessions[ises].distmat_xy[np.ix_(idx_N_ses,idx_nearby_ses)]
 
 #%% 
 nboots          = 100
@@ -455,7 +548,7 @@ loopdata_subplots   = np.stack((loopmean,loopmean_abs,loopfrac[:,0],loopfrac[:,1
 bootdata_subplots   = np.stack((bootmean,bootmean_abs,bootfrac[:,0],bootfrac[:,1],bootfrac[:,2]),axis=2)
 nmetrics            = len(subplotlabels)
 params['ci']        = 95
-fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*5*cm,8*cm))
+fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*2.2,4))
 clrs_arealabelpairs = [ '#9933FF','#00CC99']
 
 for ialp in range(2):
@@ -492,7 +585,7 @@ loopdata_subplots   = np.stack((loopmean[:,irad],loopmean_abs[:,irad],loopfrac[:
 bootdata_subplots   = np.stack((bootmean[:,irad],bootmean_abs[:,irad],bootfrac[:,0,irad],bootfrac[:,1,irad],bootfrac[:,2,irad]),axis=1)
 nmetrics            = len(subplotlabels)
 
-fig,axes = plt.subplots(2,nmetrics+1,figsize=(nmetrics*5*cm,8*cm))
+fig,axes = plt.subplots(2,nmetrics+1,figsize=(nmetrics*2.2,4))
 
 for ialp in range(2):
     axes[ialp,0].plot(binedges[:-1],loophist[ialp,:,irad],color=clrs_arealabelpairs[ialp])
@@ -519,146 +612,13 @@ for ialp in range(2):
         ax.text(loopdata_subplots[ialp,imetric],ax.get_ylim()[1]*0.8,get_sig_asterisks(np.min([pval,1-pval]),return_ns=True),fontsize=12,color=clrs_arealabelpairs[ialp])
         if ialp == 0:
             ax.set_title(subplotlabels[imetric])
-        ax_nticks(ax,3)
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 # my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radius%d' % (radius))
 
-#%% Compute the fraction of looped neurons with at least two neighbours within a radius:
-legendlabels        = ['PM','V1']
-radii               = np.arange(0,100,10)
-fraclooped          = np.zeros((2,len(radii)))
+#%% 
 
-for iradius,radius in enumerate(radii):
-    fraclooped[0,iradius] = np.sum(np.sum(idx_PMlab_allnear[:,1,:]<=radius,axis=1)>=min_nearby) / np.shape(idx_PMlab)[0]
-    fraclooped[1,iradius] = np.sum(np.sum(idx_V1lab_allnear[:,1,:]<=radius,axis=1)>=min_nearby) / np.shape(idx_V1lab)[0]
-
-#%% Show the fraction of nonlooped neurons within a radius from looped cells:
-fig,ax = plt.subplots(1,1,figsize=(5*cm,5*cm),sharex=True,sharey=True)
-for ialp,alp in enumerate(legendlabels):
-    ax.plot(radii,fraclooped[ialp,:],color=clrs_arealabelpairs[ialp])
-    ax.set_ylim([0,1])
-    ax.set_yticks([0,0.5,1])
-    # ax.set_xticks(radii)
-    ax.set_xticks(np.arange(0,radii[-1]+10,25))
-    ax.set_xlabel('Radius (um)')
-    if ialp == 0: 
-        ax.set_ylabel('Fraction looped cells included')
-
-plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Fraction_looped_2respneighbours_distance_V1PM_%dsessions' % nSessions)
-
-#%% Compute the number of nonlooped neurons within radius
-legendlabels        = ['PM','V1']
-radii               = np.arange(0,300,10)
-nNonlooped          = np.zeros((2,len(radii)))
-
-for iradius,radius in enumerate(radii):
-    nNonlooped[0,iradius] = np.nanmean(np.sum(idx_PMlab_allnear[:,1,:]<=radius,axis=1))
-    nNonlooped[1,iradius] = np.nanmean(np.sum(idx_V1lab_allnear[:,1,:]<=radius,axis=1))
-
-#%% Show the fraction of nonlooped neurons within a radius from looped cells:
-fig,ax = plt.subplots(1,1,figsize=(5*cm,5*cm),sharex=True,sharey=True)
-for ialp,alp in enumerate(legendlabels):
-    ax.plot(radii,nNonlooped[ialp,:],color=clrs_arealabelpairs[ialp])
-    # ax.set_ylim([0,1])
-    ax.set_xticks(np.arange(0,radii[-1]+100,100))
-    ax.set_xlabel('Radius (um)')
-    if ialp == 0: 
-        ax.set_ylabel('# nonlooped cells')
-
-plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Number_nonlooped_distance_V1PM_%dsessions' % nSessions)
-
-#%% Show an example plane: 
-
-import matplotlib.patches as patches
-
-
-def plot_rf_plane(celldata,iplane=0,cellfield='modulation',radius=50):
-    
-    cmap = sns.color_palette('bwr',as_cmap=True)
-    cmap_lims       = np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99])))
-    cmap_lims       = np.round(np.array([-cmap_lims,cmap_lims]),2)
-    fig,axes        = plt.subplots(1,1,figsize=(3.1,3))
-    ax = axes
-    idx_plane         = celldata['plane_idx']==iplane
-    area = celldata['roi_name'][idx_plane].values[0]
-    depth = celldata['depth'][idx_plane].values[0]
-    # circlesize = (radius * 600/512)**2
-    # circlesize = radius**2
-    neuronsize = 5**2
-    # sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                # hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=35,edgecolor="none")
-    
-    idx_labeled = np.logical_and(celldata['redcell']==1,idx_plane)
-    idx_unlabeled = np.logical_and(celldata['redcell']==0,idx_plane)
-
-    sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                hue=celldata[cellfield][idx_labeled],ax=ax,palette=cmap,s=neuronsize,edgecolor="k",linewidth=1)
-
-    sns.scatterplot(data = celldata[idx_unlabeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                hue=celldata[cellfield][idx_unlabeled],ax=ax,palette=cmap,s=neuronsize,edgecolor="none")
-
-    for idx in np.where(idx_labeled)[0]:
-        # 3. Create Circle Patch
-        # The radius parameter corresponds to data units (x units)
-        center_x = celldata['xloc'].iloc[idx]
-        center_y = celldata['yloc'].iloc[idx]
-        # circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='k', linewidth=1)
-        circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=1)
-        ax.add_artist(circle)
-        ax.set_aspect(1)
-
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.9, box.height * 0.9])  # Shrink current axis's height by 10% on the bottom
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim([0,600])
-    ax.set_ylim([0,600])
-    ax.set_title('%s, plane %d, depth %d (um)' % (area,iplane,depth),fontsize=10)
-    ax.set_facecolor("grey")
-    ax.invert_yaxis()
-
-    norm = plt.Normalize(cmap_lims[0],cmap_lims[1])
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-
-    ax.get_legend().remove()
-    # Remove the legend and add a colorbar (optional)
-    handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
-    handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
-    handle.ax.tick_params(labelsize=7)
-    handle.ax.set_ylabel('modulation',fontsize=8)
-    plt.tight_layout()
-
-    return fig
-
-#%%
-celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
-for ises in range(nSessions):
-    #get index of all cells in this session
-    idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
-    sessions[ises].celldata['modulation'] = np.nanmean(corrdata_cells[:,idx_ses],axis=0)
-
-#%%
-ises = 1
-iplane = 3
-fig = plot_rf_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70) 
-filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
-# fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
-
-#%%
-ises = 7
-iplane = 6
-fig = plot_rf_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70)
-filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
-fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 
 
@@ -667,6 +627,7 @@ fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='t
 
 
 #%%
+                                            
 #       ####   ####  #####  # #    #  ####  
 #      #    # #    # #    # # ##   # #    # 
 #      #    # #    # #    # # # #  # #      
@@ -675,14 +636,12 @@ fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='t
 ######  ####   ####  #      # #    #  ####  
 
 
-
-# OLD!!!! 
 #%% 
 for ises in range(nSessions):
     sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'],metric='xyz')
 celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
-# # %% Set threshold for significant correlations based on correlation value: 
+#%% Set threshold for significant correlations based on correlation value: 
 # corrsig_cells = np.full((narealabelpairs,nCells),np.nan)
 # corrsig_cells[corrdata_cells>0.25]           = 1
 # corrsig_cells[corrdata_cells<-0.25]          = -1
