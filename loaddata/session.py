@@ -16,6 +16,7 @@ from sklearn.preprocessing import minmax_scale
 
 from loaddata.get_data_folder import get_data_folder
 from utils.psth import *
+from utils.filter_lib import my_highpass_filter
 
 class Session():
 

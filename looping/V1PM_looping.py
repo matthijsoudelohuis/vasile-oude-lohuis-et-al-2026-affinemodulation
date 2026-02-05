@@ -8,7 +8,7 @@ from tqdm import tqdm
 from scipy.stats import linregress,ranksums
 from scipy import stats
 
-os.chdir('e:\\Python\\oudelohuis-et-al-2026-anatomicalsubspace')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *
