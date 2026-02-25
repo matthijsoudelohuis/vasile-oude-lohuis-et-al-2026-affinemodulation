@@ -8,7 +8,7 @@ from tqdm import tqdm
 from scipy.stats import linregress,ranksums
 from scipy import stats
 
-os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *
@@ -574,72 +574,6 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 # my_savefig(fig,savedir,'Number_nonlooped_distance_V1PM_%dsessions' % nSessions)
 
 #%% Show an example plane: 
-
-import matplotlib.patches as patches
-
-
-def plot_rf_plane(celldata,iplane=0,cellfield='modulation',radius=50):
-    
-    cmap = sns.color_palette('bwr',as_cmap=True)
-    cmap_lims       = np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99])))
-    cmap_lims       = np.round(np.array([-cmap_lims,cmap_lims]),2)
-    fig,axes        = plt.subplots(1,1,figsize=(3.1,3))
-    ax = axes
-    idx_plane         = celldata['plane_idx']==iplane
-    area = celldata['roi_name'][idx_plane].values[0]
-    depth = celldata['depth'][idx_plane].values[0]
-    # circlesize = (radius * 600/512)**2
-    # circlesize = radius**2
-    neuronsize = 5**2
-    # sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                # hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=35,edgecolor="none")
-    
-    idx_labeled = np.logical_and(celldata['redcell']==1,idx_plane)
-    idx_unlabeled = np.logical_and(celldata['redcell']==0,idx_plane)
-
-    sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                hue=celldata[cellfield][idx_labeled],ax=ax,palette=cmap,s=neuronsize,edgecolor="k",linewidth=1)
-
-    sns.scatterplot(data = celldata[idx_unlabeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                hue=celldata[cellfield][idx_unlabeled],ax=ax,palette=cmap,s=neuronsize,edgecolor="none")
-
-    for idx in np.where(idx_labeled)[0]:
-        # 3. Create Circle Patch
-        # The radius parameter corresponds to data units (x units)
-        center_x = celldata['xloc'].iloc[idx]
-        center_y = celldata['yloc'].iloc[idx]
-        # circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='k', linewidth=1)
-        circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=1)
-        ax.add_artist(circle)
-        ax.set_aspect(1)
-
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.9, box.height * 0.9])  # Shrink current axis's height by 10% on the bottom
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim([0,600])
-    ax.set_ylim([0,600])
-    ax.set_title('%s, plane %d, depth %d (um)' % (area,iplane,depth),fontsize=10)
-    ax.set_facecolor("grey")
-    ax.invert_yaxis()
-
-    norm = plt.Normalize(cmap_lims[0],cmap_lims[1])
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-
-    ax.get_legend().remove()
-    # Remove the legend and add a colorbar (optional)
-    handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
-    handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
-    handle.ax.tick_params(labelsize=7)
-    handle.ax.set_ylabel('modulation',fontsize=8)
-    plt.tight_layout()
-
-    return fig
-
-#%%
 celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 for ises in range(nSessions):
     #get index of all cells in this session
@@ -649,14 +583,14 @@ for ises in range(nSessions):
 #%%
 ises = 1
 iplane = 3
-fig = plot_rf_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70) 
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70) 
 filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
 # fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 #%%
 ises = 7
 iplane = 6
-fig = plot_rf_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70)
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70)
 filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
 fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 

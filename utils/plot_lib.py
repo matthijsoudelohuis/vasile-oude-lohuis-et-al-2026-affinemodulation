@@ -15,7 +15,7 @@ from matplotlib.collections import LineCollection
 import warnings
 from scipy.stats import pearsonr,ttest_rel
 import copy
-from statannotations.Annotator import Annotator
+import matplotlib.patches as patches
 
 def set_plot_basic_config():
     plt.rcParams.update({'font.size': 7, 'xtick.labelsize': 6, 'ytick.labelsize': 6, 'axes.titlesize': 8,
@@ -249,6 +249,80 @@ def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
     lc.set_array(c)
 
     return ax.add_collection(lc)
+
+
+
+def plot_mod_plane(celldata,iplane=0,cellfield='modulation',
+                    id_sig=True,id_looped=False,radiuslooped=False,radius=50):    
+    cmap = sns.color_palette('bwr',as_cmap=True)
+    cmap_lims       = np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99])))
+    cmap_lims       = np.round(np.array([-cmap_lims,cmap_lims]),1)
+    fig,axes        = plt.subplots(1,1,figsize=(3.3,3))
+    ax = axes
+    idx_plane         = celldata['plane_idx']==iplane
+    area = celldata['roi_name'][idx_plane].values[0]
+    depth = celldata['depth'][idx_plane].values[0]
+    # circlesize = (radius * 600/512)**2
+    # circlesize = radius**2
+    rad = 5
+    # sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
+                # hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=35,edgecolor="none")
+    if id_sig:
+        idx_pos = np.logical_and(celldata['sigmod']==1,idx_plane)
+        sns.scatterplot(data = celldata[idx_pos],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor="r",linewidth=1)
+        idx_neg = np.logical_and(celldata['sigmod']==-1,idx_plane)
+        sns.scatterplot(data = celldata[idx_neg],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor="b",linewidth=1)
+    
+    sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
+                hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=rad**2,edgecolor=None,linewidth=0)
+ 
+    idx_labeled = np.logical_and(celldata['redcell']==1,idx_plane)
+    idx_unlabeled = np.logical_and(celldata['redcell']==0,idx_plane)
+
+    if id_looped:
+        sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
+                    hue=celldata[cellfield][idx_labeled],ax=ax,palette=cmap,s=rad**2,edgecolor="k",linewidth=1)
+
+        sns.scatterplot(data = celldata[idx_unlabeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
+                    hue=celldata[cellfield][idx_unlabeled],ax=ax,palette=cmap,s=rad**2,edgecolor="none")
+    
+    if radiuslooped:
+        for idx in np.where(idx_labeled)[0]:
+            # 3. Create Circle Patch
+            # The radius parameter corresponds to data units (x units)
+            center_x = celldata['xloc'].iloc[idx]
+            center_y = celldata['yloc'].iloc[idx]
+            # circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='k', linewidth=1)
+            circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=1)
+            ax.add_artist(circle)
+            ax.set_aspect(1)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.9, box.height * 0.9])  # Shrink current axis's height by 10% on the bottom
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim([0,600])
+    ax.set_ylim([0,600])
+    ax.set_title('%s, plane %d, depth %d (um)' % (area,iplane,depth),fontsize=10)
+    ax.set_facecolor("grey")
+    ax.invert_yaxis()
+
+    norm = plt.Normalize(cmap_lims[0],cmap_lims[1])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    if np.any(celldata[cellfield][idx_plane]):
+        ax.get_legend().remove()
+        # Remove the legend and add a colorbar (optional)
+        handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
+        handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
+        handle.ax.tick_params(labelsize=7)
+        handle.ax.set_ylabel('modulation',fontsize=8)
+    plt.tight_layout()
+
+    return fig
 
 def add_corr_results(ax, x,y,pos=[0.2,0.1],fontsize=8):
     nas = np.logical_or(np.isnan(x), np.isnan(y))

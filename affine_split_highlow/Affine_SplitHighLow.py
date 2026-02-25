@@ -67,7 +67,6 @@ celldata                = pd.concat([sessions[ises].celldata for ises in range(n
 arealabels  = ['V1lab','V1unl','PMlab','PMunl']
 
 # def arealabeled_to_figlabels(arealabeled):
-
 fig,axes = plt.subplots(1,2,figsize=(9*cm,4*cm),sharex=True,sharey=True)
 ax = axes[0]
 arealabels  = ['V1unl','V1lab']
@@ -171,31 +170,30 @@ sns.despine(fig=fig, top=True, right=True,offset=0)
 # my_savefig(fig,savedir,'StillTrials_Selection')
 
 
-#%% 
-ises = 0
-fig, axes = plt.subplots(1,1,figsize=(6,2.5))
-ax = axes
-idx_N_FF              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'V1lab',),axis=0))[0]
-idx_N_FB              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'PMlab',),axis=0))[0]
-idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
-                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
-respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
+# #%% 
+# ises = 6
+# fig, axes = plt.subplots(1,1,figsize=(6,2.5))
+# ax = axes
+# idx_N_FF              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'V1lab',),axis=0))[0]
+# idx_N_FB              = np.where(np.all((sessions[ises].celldata['arealabel'] == 'PMlab',),axis=0))[0]
+# idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+#                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
+# respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-meanpopact_FF          = np.nanmean(respdata[idx_N_FF,:],axis=0)
-meanpopact_FB          = np.nanmean(respdata[idx_N_FB,:],axis=0)
-ax.plot(meanpopact_FF[idx_T_still],color=clrs_arealabelpairs[0],linewidth=0.4)
-ax.plot(meanpopact_FB[idx_T_still],color=clrs_arealabelpairs[1],linewidth=0.4)
-ax.set_xlim([0,500])
-ax.set_ylim(np.percentile([meanpopact_FF[idx_T_still][:500],meanpopact_FB[idx_T_still][:500]],[0,100]))
-ax.set_xlabel('Trials',fontsize=10)
-ax.set_ylabel('Population activity (deconv/dF0)',fontsize=10)
-ax.set_title('Population activity',fontsize=13)
-ax.text(0.1,0.8,'r = %1.2f, p = %1.2f' % (pearsonr(meanpopact_FF[idx_T_still],meanpopact_FB[idx_T_still])[0],pearsonr(meanpopact_FF[idx_T_still],meanpopact_FB[idx_T_still])[1]),transform=ax.transAxes,fontsize=8)
-ax_nticks(ax,4)
-plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
-# my_savefig(fig,savedir,'PopulationActivity_Trials_FF_FB', formats = ['png'])
-
+# meanpopact_FF          = np.nanmean(respdata[idx_N_FF,:],axis=0)
+# meanpopact_FB          = np.nanmean(respdata[idx_N_FB,:],axis=0)
+# ax.plot(meanpopact_FF[idx_T_still],color=clrs_arealabelpairs[0],linewidth=0.4)
+# ax.plot(meanpopact_FB[idx_T_still],color=clrs_arealabelpairs[1],linewidth=0.4)
+# ax.set_xlim([0,500])
+# ax.set_ylim(np.percentile([meanpopact_FF[idx_T_still][:500],meanpopact_FB[idx_T_still][:500]],[0,100]))
+# ax.set_xlabel('Trials',fontsize=10)
+# ax.set_ylabel('Population activity (deconv/dF0)',fontsize=10)
+# ax.set_title('Population activity',fontsize=13)
+# ax.text(0.1,0.8,'r = %1.2f, p = %1.2f' % (pearsonr(meanpopact_FF[idx_T_still],meanpopact_FB[idx_T_still])[0],pearsonr(meanpopact_FF[idx_T_still],meanpopact_FB[idx_T_still])[1]),transform=ax.transAxes,fontsize=8)
+# ax_nticks(ax,4)
+# plt.tight_layout()
+# sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
+# # my_savefig(fig,savedir,'PopulationActivity_Trials_FF_FB', formats = ['png'])
 #%% Correlation matrix between the different populations
 arealabelpairs  = ['V1unl','V1lab','PMunl','PMlab']
 narealabelpairs = len(arealabelpairs)
@@ -235,11 +233,74 @@ cbar.set_label('Correlation', rotation=270, labelpad=10)
 ises = 6
 idx_T_still = np.where(np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                                 sessions[ises].respmat_runspeed < params['maxrunspeed']))[0]
-                                
+respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
 # axislabels  = ['V1unl','V1lab','PMunl','PMlab']
 
+np.random.seed(1)
+trialstoplot = np.arange(700,750)
+# trialstoplot = np.arange(1600,1630)
+# trialstoplot = np.arange(1630,1650)
+# trialstoplot = np.arange(1500,1630)
+fig,axes = plt.subplots(2,1,figsize=(6*cm,6*cm),sharex=True,sharey=True)
+for ialp,alp in enumerate(arealabelpairs):
+    ax = axes[ialp]
+
+    idx_source_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
+                                                sessions[ises].celldata['nearby']
+                                                ),axis=0))[0]
+    idx_source_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
+                                                sessions[ises].celldata['nearby']
+                                                ),axis=0))[0]
+
+    # subsampleneurons    = np.min([idx_source_N1.shape[0],idx_source_N2.shape[0]])
+    # idx_source_N1       = np.random.choice(idx_source_N1,subsampleneurons,replace=False)
+    # idx_source_N2       = np.random.choice(idx_source_N2,subsampleneurons,replace=False)
+
+    meanpopact_N1       = np.nanmean(respdata[np.ix_(idx_source_N1,idx_T_still)],axis=0) #np.nanmean(respdata[idx_source_N1,:],axis=0)
+    meanpopact_N2       = np.nanmean(respdata[np.ix_(idx_source_N2,idx_T_still)],axis=0)
+    meanpopact_N3       = meanpopact_N1 - meanpopact_N2
+
+    ax.plot(meanpopact_N1,color=clrs_arealabels_low_high[1-ialp,1],marker='.',markersize=5,linewidth=1)
+    ax.plot(meanpopact_N2,color=clrs_arealabels_low_high[1-ialp,0],marker='.',markersize=5,linewidth=1)
+
+    # ax.fill_between(range(len(meanpopact_N3)),
+    #                 np.max([meanpopact_N1,meanpopact_N2],axis=0),
+    #                 meanpopact_N2,color=clrs_arealabels_low_high[ialp,1],alpha=0.3)
+    # ax.fill_between(range(len(meanpopact_N3)),
+    #                 np.max([meanpopact_N1,meanpopact_N2],axis=0),
+    #                 meanpopact_N1,color=clrs_arealabels_low_high[ialp,0],alpha=0.3)
+
+    # ax.plot(meanpopact_N3,color='grey',linewidth=0.4)
+    ax.legend(alp.split('-'),frameon=False)
+    my_legend_strip(ax)
+    ax.set_xlim(np.percentile(trialstoplot,[0,100]))
+    ax.set_ylim(np.percentile([meanpopact_N1[trialstoplot],meanpopact_N2[trialstoplot]],[0,100]))
+    if ialp==1:
+        ax.set_xlabel('Trials')
+    if ialp==0:
+        ax.set_ylabel('Mean activity (dc/dF0)')
+    ax.text(0.1,0.8,'r = %1.2f, p = %1.2f' % (pearsonr(meanpopact_N1,meanpopact_N2)),transform=ax.transAxes,fontsize=6)
+    ax_nticks(ax,4)
+plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
+# my_savefig(fig,savedir,'PopulationActivity_Trials_FF_FB')
+
+#%% 
 vscale      = 0.015
+cmap = 'coolwarm'
+cmap = sns.color_palette('Greens',as_cmap=True)
+cmap = sns.color_palette('Greens',as_cmap=True)
+cmaps = [sns.color_palette('Greens',as_cmap=True),
+         sns.color_palette('Purples',as_cmap=True)]
+np.random.seed(6)
+
+cmap = matplotlib.colors.ListedColormap(["red","violet","blue"], name='from_list', N=None)
+# m = cm.ScalarMappable(norm=norm, cmap=cmap)
+cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],"white",clrs_arealabels_low_high[1,1]]),
+         matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],"white",clrs_arealabels_low_high[0,1]])]
+cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],[0.7,0.8,0.7],clrs_arealabels_low_high[1,1]]),
+         matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],[0.8,0.7,0.8],clrs_arealabels_low_high[0,1]])]
 
 fig,axes = plt.subplots(2,1,figsize=(5*cm,8*cm))
 for ialp,alp in enumerate(arealabelpairs):
@@ -264,9 +325,11 @@ for ialp,alp in enumerate(arealabelpairs):
     meanpopact_N2       = np.nanmean(respdata[np.ix_(idx_source_N2,idx_T_still)],axis=0)
 
     vmin,vmax = np.percentile([meanpopact_N1 - meanpopact_N2],[5,95])
+    vmin,vmax = -np.max(np.abs([vmin,vmax])),np.max(np.abs([vmin,vmax]))
+
     # vmax = np.percentile([meanpopact_N2,meanpopact_N1],[99.5,99.5])
     ax=axes[ialp]
-    ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 - meanpopact_N2,s=0.2,cmap='coolwarm',vmin=vmin,vmax=vmax)
+    ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 - meanpopact_N2,s=0.2,cmap=cmaps[ialp],vmin=vmin,vmax=vmax)
     # ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 / meanpopact_N2,s=0.2,cmap='coolwarm',vmin=-vscale,vmax=vscale)
 
     ax.text(0.1,0.8,'%s > %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),transform=ax.transAxes)
@@ -609,6 +672,35 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
+
+#%% Show an example plane: 
+celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
+for ises in range(nSessions):
+    #get index of all cells in this session
+    idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
+    sessions[ises].celldata['modulation']   = np.nanmean(corrdata_cells[:,idx_ses],axis=0)
+    sessions[ises].celldata['sigmod']       = np.nanmean(corrsig_cells[:,idx_ses],axis=0)
+celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
+
+#%%
+ises = 0
+iplane = 3
+ises = 4
+iplane = 4
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',
+                     id_sig=True,id_looped=False,radiuslooped=False,radius=50) 
+filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
+fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
+
+#%%
+ises = 3
+iplane = 3
+ises = 6
+iplane = 2
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70) 
+filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
+fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
+
 
 #%% Show some example neurons:
 
