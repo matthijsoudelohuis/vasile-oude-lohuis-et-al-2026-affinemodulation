@@ -139,14 +139,14 @@ def get_stack_data_v2(direc,model=model_red):
     return data
 
 
-def plot_depthprofile(data,ax,clr):
+def plot_depthprofile(data,ax,clr,individuallinewidth=0.5,meanlinewidth=2):
     # data is assumed to have shape S x M where 
     # S is slices (75) and M is number of mice 
     data_mean = np.nanmean(data,axis=1)
     data_err = np.nanstd(data,axis=1) / np.sqrt(np.shape(data)[1])
 
-    ax.plot(data,slicedepths,c=clr,linewidth=0.25)
-    h, = ax.plot(data_mean,slicedepths,c=clr,linewidth=3)
+    ax.plot(data,slicedepths,c=clr,linewidth=individuallinewidth)
+    h, = ax.plot(data_mean,slicedepths,c=clr,linewidth=meanlinewidth)
     # h = shaded_error(slicedepths,data.T,center='mean',error='std',color=clr,ax=ax)
     # h, = ax.plot(x,ycenter,color=color,linestyle=linestyle,label=label,linewidth=linewidth)
     # ax.fill_between(x, ycenter-yerror, ycenter+yerror,color=color,alpha=alpha)
@@ -209,21 +209,24 @@ for iA,animal_id in enumerate(animal_ids): #for each animal
 #%% ######################  Make depth profile of # of labeled cells: ############################
 clrs_areas  = get_clr_areas(['V1','PM'])
 
-fig,axes   = plt.subplots(1,2,figsize=(6*cm,6*cm),sharey=True,sharex=False)
+clrs_labeled = get_clr_labeled()
+fig,axes   = plt.subplots(1,2,figsize=(3.8*cm,4.2*cm),sharey=True,sharex=True)
 ax = axes[0]
-plot_depthprofile(dataV1[1,:,:],ax,clrs_areas[0])
-ax.set_title(r"$V1_{PM}$",c=clrs_areas[0])
-ax.set_title(r"$V1$",c=clrs_areas[0])
+plot_depthprofile(dataV1[1,:,:],ax,clrs_labeled[1],individuallinewidth=0.25,meanlinewidth=1.5)
+# ax.set_title(r"$V1_{PM}$ cells",c=clrs_labeled[1])
+ax.set_title(r"$V1_{PM}$ cells",c='k')
+# ax.set_title(r"$V1$",c=clrs_areas[0])
 ax.set_ylim([0,750])
+ax.set_xticks(np.arange(0,150,step=50))
 ax.set_yticks(np.arange(0,800,step=250))
 ax.invert_yaxis()
-ax.set_ylabel('Cortical Depth')
+ax.set_ylabel('cortical depth (\xb5m)')
 ax.set_xlabel('tdTomato+ cells')
 
 ax = axes[1]
-plot_depthprofile(dataPM[1,:,:],ax,clrs_areas[1])
-ax.set_title(r"$PM$",c=clrs_areas[1])
-
+plot_depthprofile(dataPM[1,:,:],ax,clrs_labeled[1],individuallinewidth=0.25,meanlinewidth=1.5)
+ax.set_title(r"$PM_{V1}$ cells",c='k')
+fig.suptitle('laminar distribution',x=0.6,y=0.88,fontsize=6)
 sns.despine(fig=fig, top=True, right=True, offset=1,trim=True)
 plt.tight_layout()
 my_savefig(fig,savedir,'LabeledCells_Depth_%danimals' % nanimals)

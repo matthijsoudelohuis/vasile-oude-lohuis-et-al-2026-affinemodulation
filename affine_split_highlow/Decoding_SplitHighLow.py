@@ -694,7 +694,7 @@ for iparam,param in enumerate(['slope','offset']):
         # ax.scatter(xdata,ydata, marker='o', color=clrs_arealabelpairs[ialp])
         # ax.scatter(xdata,ydata, marker='.', color=clrs_arealabelpairs[ialp])
         sns.regplot(x=xdata,y=ydata,ax=ax,scatter=True,ci=95,color=clrs_arealabelpairs[ialp],
-                    scatter_kws={'s':1},line_kws={'color':clrs_arealabelpairs[ialp]})
+                    scatter_kws={'s':1,'edgecolor':'None'},line_kws={'color':clrs_arealabelpairs[ialp]})
     ax.axhline(0,linestyle='--',color='k',alpha=0.5)
 
     if iparam==0:

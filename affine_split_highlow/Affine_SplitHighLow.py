@@ -34,14 +34,15 @@ arealabelpairs  = ['V1lab-V1unl-PMunlL2/3',
                     'PMlab-PMunl-V1unlL2/3']
 clrs_arealabelpairs         = get_clr_arealabelpairs(arealabelpairs)
 clrs_arealabels_low_high    = get_clr_area_low_high()  # PMlab-PMunl-V1unl
+clrs_labeled = get_clr_labeled(['unl','lab'])
 
 #%% #############################################################################
-session_list            = np.array([['LPE10919_2023_11_06']])
-session_list            = np.array([['LPE12223_2024_06_10']])
-session_list            = np.array([['LPE11086_2024_01_05','LPE12223_2024_06_10']])
+# session_list            = np.array([['LPE10919_2023_11_06']])
+# session_list            = np.array([['LPE12223_2024_06_10']])
+# session_list            = np.array([['LPE11086_2024_01_05','LPE12223_2024_06_10']])
 
-sessions,nSessions      = filter_sessions(protocols = ['GR'],only_session_id=session_list,filter_noiselevel=True)
-sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
+# sessions,nSessions      = filter_sessions(protocols = ['GR'],only_session_id=session_list,filter_noiselevel=True)
+# sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 
 #%% Load all GR sessions: 
 sessions,nSessions   = filter_sessions(protocols = 'GR',filter_noiselevel=True)
@@ -66,17 +67,18 @@ celldata                = pd.concat([sessions[ises].celldata for ises in range(n
 #%% Show preferred orientation across all cells in GR protocol:
 arealabels  = ['V1lab','V1unl','PMlab','PMunl']
 
-# def arealabeled_to_figlabels(arealabeled):
-fig,axes = plt.subplots(1,2,figsize=(9*cm,4*cm),sharex=True,sharey=True)
+
+fig,axes = plt.subplots(1,2,figsize=(7*cm,3.9*cm),sharex=True,sharey=True)
 ax = axes[0]
 arealabels  = ['V1unl','V1lab']
-clrs_area_labeled = get_clr_area_labeled(arealabels)
+clrs = get_clr_area_labeled(arealabels)
+clrs = get_clr_labeled(['unl','lab'])
 pref_oris_unl = celldata.loc[celldata['arealabel']==arealabels[0],'pref_ori']
 pref_oris_lab = celldata.loc[celldata['arealabel']==arealabels[1],'pref_ori']
 ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[0],label=arealabels[0],alpha=1)
+    histtype='step',color=clrs[0],alpha=1)
 ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[1],label=arealabels[1],alpha=1)
+    histtype='step',color=clrs[1],alpha=1)
 leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
 
 stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
@@ -84,36 +86,36 @@ ax.text(0.5, 0.05, 'KS-test (%1.2f),p=%1.2f' % (stat,pval), horizontalalignment=
         transform=ax.transAxes,fontsize=6)
 for lh in leg.legend_handles:
     lh.set_visible(False)
-for text, color in zip(leg.texts, get_clr_area_labeled(arealabels)):
+for text, color in zip(leg.texts, clrs):
     text.set_color(color)
-ax.set_xlabel('Pref. direction (deg)')
-ax.set_ylabel('Density (a.u.)')
+ax.set_xlabel('pref. direction (deg)')
+ax.set_ylabel('density (a.u.)')
 ax.set_xticks(np.arange(0,360,45))
 ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
-ax.set_title('V1',color=clrs_area_labeled[0],fontsize=9)
+# ax.set_title('V1',color=clrs[0],fontsize=9)
+ax.set_title('V1',color='k',fontsize=7)
 
 arealabels  = ['PMlab','PMunl']
 ax = axes[1]
 
-clrs_area_labeled = get_clr_area_labeled(arealabels)
 pref_oris_unl = celldata.loc[celldata['arealabel']==arealabels[0],'pref_ori']
 pref_oris_lab = celldata.loc[celldata['arealabel']==arealabels[1],'pref_ori']
 stat, pval = ks_2samp(pref_oris_unl,pref_oris_lab)
 ax.text(0.5, 0.05, 'KS-test (%1.2f),p=%1.2f' % (stat,pval), horizontalalignment='center',
         transform=ax.transAxes,fontsize=6)
 ax.hist(pref_oris_unl,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[0],label=arealabels[0],alpha=1)
+    histtype='step',color=clrs[0],label=arealabels[0],alpha=1)
 ax.hist(pref_oris_lab,bins=np.arange(0,360+22.5,22.5)-22.5/2,density=True,
-    histtype='step',color=clrs_area_labeled[1],label=arealabels[1],alpha=1)
+    histtype='step',color=clrs[1],label=arealabels[1],alpha=1)
 leg = ax.legend(arealabeled_to_figlabels(arealabels),frameon=False,ncol=1,loc='upper right')
 for lh in leg.legend_handles:
     lh.set_visible(False)
-for text, color in zip(leg.texts, get_clr_area_labeled(arealabels)):
+for text, color in zip(leg.texts, clrs):
     text.set_color(color)
-ax.set_xlabel('Pref. direction (deg)')
+ax.set_xlabel('pref. direction (deg)')
 ax.set_xticks(np.arange(0,360,45))
 ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
-ax.set_title('PM',color=clrs_area_labeled[0],fontsize=9)
+ax.set_title('PM',color='k',fontsize=7)
 
 plt.tight_layout()
 sns.despine(fig=fig,trim=False,offset=1,top=True,right=True)
@@ -295,16 +297,22 @@ cmaps = [sns.color_palette('Greens',as_cmap=True),
          sns.color_palette('Purples',as_cmap=True)]
 np.random.seed(6)
 
-cmap = matplotlib.colors.ListedColormap(["red","violet","blue"], name='from_list', N=None)
-# m = cm.ScalarMappable(norm=norm, cmap=cmap)
-cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],"white",clrs_arealabels_low_high[1,1]]),
-         matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],"white",clrs_arealabels_low_high[0,1]])]
-cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],[0.7,0.8,0.7],clrs_arealabels_low_high[1,1]]),
-         matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],[0.8,0.7,0.8],clrs_arealabels_low_high[0,1]])]
+# cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_labeled[0],clrs_labeled[0],clrs_labeled[1]])
+cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ['grey','grey','red'])
 
-fig,axes = plt.subplots(2,1,figsize=(5*cm,8*cm))
+# cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],"white",clrs_arealabels_low_high[1,1]]),
+#          matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],"white",clrs_arealabels_low_high[0,1]])]
+# cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[1,0],[0.7,0.8,0.7],clrs_arealabels_low_high[1,1]]),
+#          matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_arealabels_low_high[0,0],[0.8,0.7,0.8],clrs_arealabels_low_high[0,1]])]
+
+# cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", ['grey','grey','red']),
+#             matplotlib.colors.LinearSegmentedColormap.from_list("", ['grey','grey','red'])]
+# cmaps = [matplotlib.colors.LinearSegmentedColormap.from_list("", ['grey','grey','red']),
+#             matplotlib.colors.LinearSegmentedColormap.from_list("", [clrs_labeled[0],clrs_labeled[0],clrs_labeled[1]])]
+
+fig,axes = plt.subplots(2,1,figsize=(4.5*cm,7*cm))
 for ialp,alp in enumerate(arealabelpairs):
-    respdata        = sessions[ises].respmat
+    respdata            = sessions[ises].respmat
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
@@ -325,39 +333,51 @@ for ialp,alp in enumerate(arealabelpairs):
     meanpopact_N2       = np.nanmean(respdata[np.ix_(idx_source_N2,idx_T_still)],axis=0)
 
     vmin,vmax = np.percentile([meanpopact_N1 - meanpopact_N2],[5,95])
-    vmin,vmax = -np.max(np.abs([vmin,vmax])),np.max(np.abs([vmin,vmax]))
+    absmax = my_ceil(np.max(np.abs([vmin,vmax])),2)
+    vmin,vmax = -absmax,absmax
 
-    # vmax = np.percentile([meanpopact_N2,meanpopact_N1],[99.5,99.5])
     ax=axes[ialp]
-    ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 - meanpopact_N2,s=0.2,cmap=cmaps[ialp],vmin=vmin,vmax=vmax)
-    # ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 / meanpopact_N2,s=0.2,cmap='coolwarm',vmin=-vscale,vmax=vscale)
+    handle = ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 - meanpopact_N2,s=0.2,cmap=cmap,vmin=vmin,vmax=vmax,alpha=0.8)
+    # handle = ax.scatter(meanpopact_N2,meanpopact_N1,c=meanpopact_N1 - meanpopact_N2,s=2,cmap=cmap,vmin=vmin,vmax=vmax,
+    #                     edgecolor='none',alpha=1)
+    
+    # ax.text(0.1,0.8,'%s > %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),transform=ax.transAxes)
+    # ax.text(0.7,0.2,'%s < %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),transform=ax.transAxes)
 
-    ax.text(0.1,0.8,'%s > %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),transform=ax.transAxes)
-    ax.text(0.7,0.2,'%s < %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),transform=ax.transAxes)
-    # ax.text(0.7,0.2,'%s < %s' % (arealabeled_to_figlabels([alp.split('-')[0]]),transform=ax.transAxes)
-    ax.plot([-1,1],[-1,1],color='k',linewidth=0.2)
+    ax.plot([-1,1],[-1,1],color='k',linewidth=0.5,linestyle='--')
     ax.set_xlim(np.percentile([meanpopact_N2,meanpopact_N1],[0.1,99.5]))
     ax.set_ylim(np.percentile([meanpopact_N2,meanpopact_N1],[0.1,99.5]))
     # ax.set_xlim([0,np.percentile([meanpopact_N2,meanpopact_N1],[99.5])])
     # ax.set_ylim([0,np.percentile([meanpopact_N2,meanpopact_N1],[99.5])])  
-    ax.set_xlabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[1]]))
-    ax.set_ylabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[0]]))
+    # ax.set_xlabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[1]]),color=clrs_labeled[0])
+    # ax.set_ylabel('Mean %s activity ' % arealabeled_to_figlabels([alp.split('-')[0]]), color=clrs_labeled[1])  
+    ax.set_xlabel('%s' % arealabeled_to_figlabels([alp.split('-')[1]]),color=clrs_labeled[0])
+    ax.set_ylabel('%s' % arealabeled_to_figlabels([alp.split('-')[0]]), color=clrs_labeled[1])
     ax_nticks(ax, 3)
-    plt.tight_layout()
-    sns.despine(fig=fig, top=True, right=True,offset=1)
-# my_savefig(fig,savedir,'Diff_LabUnl_%s' % sessiondata['session_id'][ises])
+    ax.set_xticks([0,0.05,0.1])
+    ax.set_yticks([0,0.05,0.1])
+    cbar = fig.colorbar(handle, ax=ax,shrink=0.5,ticks=[vmin,0,vmax])
+    # cbar.set_label('%s-%s' % (arealabeled_to_figlabels([alp.split('-')[0]]),arealabeled_to_figlabels([alp.split('-')[1]])),labelpad=0)
+    cbar.set_label(arealabelpair_to_figlabel(alp)[0],labelpad=0)
+plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True)
+my_savefig(fig,savedir,'Diff_LabUnl_%s' % sessiondata['session_id'][ises])
 
-#%% Show the distribution of mean activity of the labeled population and the selection of the
+#%% Show the distribution of mean activity of the labeled population 
+# and the selection of the 25% lowest and 25% highest activity trials:
 arealabelpairs  = ['V1lab','PMlab']
 arealabelpairs  = ['V1lab-V1unl','PMlab-PMunl']
+titlelabels    = ['Feedforward','Feedback']
 legendlabels    = ['FF','FB']
 
 respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
-respdata            = sessions[ises].respmat 
+# respdata            = sessions[ises].respmat 
 
+clrs = ['black','grey','red']
+# clrs = 
 # perc = 25
-step  = 0.001
-fig, axes = plt.subplots(1,2,figsize=(6,3))
+step  = 0.002
+fig, axes = plt.subplots(1,2,figsize=(7.5*cm,3.7*cm))
 for ial,alp in enumerate(arealabelpairs):
     ax = axes[ial]
     idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
@@ -375,23 +395,35 @@ for ial,alp in enumerate(arealabelpairs):
     elif params['activitymetric'] == 'difference': #Difference:
         meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
 
-    # meanpopact = meanpopact_N1 - meanpopact_N2
-
     allbins = np.arange(np.percentile(meanpopact[idx_T_still],0),np.percentile(meanpopact[idx_T_still],100),step)
     bins = allbins[allbins <= np.percentile(meanpopact[idx_T_still],params['splitperc'])]
     sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins[bins<np.percentile(meanpopact[idx_T_still],params['splitperc'])],color=clrs_arealabels_low_high[ial,0],edgecolor='none')
-    bins = allbins[np.logical_and(allbins >= np.percentile(meanpopact[idx_T_still],params['splitperc']), allbins <= np.percentile(meanpopact[idx_T_still],100-params['splitperc']))]
+    # sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins[bins<np.percentile(meanpopact[idx_T_still],params['splitperc'])],color=clrs[0],edgecolor='none')
+    bins = allbins[np.logical_and(allbins >= np.percentile(meanpopact[idx_T_still],params['splitperc'])-step, allbins <= np.percentile(meanpopact[idx_T_still],100-params['splitperc']))]
     sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color='grey',edgecolor='none')
-    bins = allbins[allbins > np.percentile(meanpopact[idx_T_still],100-params['splitperc'])]
+    # sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color=clrs[1],edgecolor='none')
+    bins = allbins[allbins > np.percentile(meanpopact[idx_T_still]-step,100-params['splitperc'])]
     sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color=clrs_arealabels_low_high[ial,1],edgecolor='none')
-    # ax.set_ylabel('FB (high)',fontsize=10)
-    ax.set_xlabel('Population activity (deconv/dF0)',fontsize=10)
-    ax.set_title(legendlabels[ial],fontsize=13)
-    ax_nticks(ax,3)
+    # sns.histplot(data=meanpopact[idx_T_still],ax=ax,kde=False,bins = bins,color=clrs[2],edgecolor='none')
+
+    # ax.text(-0.05,80,'Low %s' % legendlabels[ial],color=clrs[0],fontsize=5)
+    # ax.text(0.02,80,'High %s' % legendlabels[ial],color=clrs[2],fontsize=5)
+
+    ax.text(-0.05,80,'Low %s' % legendlabels[ial],color=clrs_arealabels_low_high[ial,0],fontsize=5)
+    ax.text(0.02,80,'High %s' % legendlabels[ial],color=clrs_arealabels_low_high[ial,1],fontsize=5)
+
+    ax.set_xticks([-0.05,0,0.06])
+    ax.set_yticks([0,100])
+    if ial == 0:
+        ax.set_ylabel('trial count')
+    else: 
+        ax.set_ylabel('')
+    ax.set_xlabel(arealabelpair_to_figlabel(alp)[0])
+    ax.set_title(titlelabels[ial])
+    # ax_nticks(ax,3)
 plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True, offset=5,trim=False)
-# my_savefig(fig,savedir,'Hist_PopAct_FF_FB')
-# my_savefig(fig,savedir,'Hist_PopAct_FF_FB%s' % sessiondata['session_id'][ises])
+sns.despine(fig=fig, top=True, right=True, offset=2,trim=True)
+my_savefig(fig,savedir,'Hist_PopAct_FF_FB%s' % sessiondata['session_id'][ises])
 
 #%%
 

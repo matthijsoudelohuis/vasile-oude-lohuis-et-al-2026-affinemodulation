@@ -41,7 +41,7 @@ def plot_excerpt(ses, trialsel=None, neuronsel=None, plot_neural=True, plot_beha
         tstop   = ses.sessiondata['tEnd'][0]
         
     cm = 1/2.54  # centimeters in inches
-    fig, ax = plt.subplots(figsize=[15*cm, 15*cm])
+    fig, ax = plt.subplots(figsize=[4.5*cm, 4.5*cm])
     counter = 0
     if plot_neural:
         if neural_version == 'traces':
@@ -82,11 +82,13 @@ def plot_norm_trace(x, y, offset=0, clr='k',multfactor=1):
 
 
 def plot_stimuli(ses, trialsel, ax,counter):
+    cmp = 'hsv'
+    # cmp = 'twilight'
 
     # Add stimuli:
     if ses.protocol == 'GR':
         oris = np.unique(ses.trialdata['Orientation'])
-        rgba_color = plt.get_cmap('hsv', lut=16)(np.linspace(0, 1, len(oris)))
+        rgba_color = plt.get_cmap(cmp, lut=16)(np.linspace(0, 1, len(oris)))
 
         for i in np.arange(trialsel[0], trialsel[1]):
             ax.add_patch(plt.Rectangle([ses.trialdata['tOnset'][i], 0], 1, counter, alpha=0.1, linewidth=0,
@@ -160,21 +162,21 @@ def plot_behavioral_traces(ses, ax, tstart,tstop, nvideoPCs=8, counter=0):
         counter -= 1
 
     ax.text(tstart, counter+nvideoPCs/2, 'video PCs',
-            fontsize=9, color='black', horizontalalignment='right')
+            color='black', horizontalalignment='right')
 
     # motionenergy = ses.videodata['motionenergy'][idx_V]
     # handles.append(plot_norm_trace(
     #     ts_V[idx_V], motionenergy, counter, clr='maroon'))
     # # labels.append('Motion Energy')
-    # ax.text(tstart, counter, 'video ME', fontsize=9,
-    #         color='black', horizontalalignment='right')
+    # ax.text(tstart, counter, 'video ME', 
+    #   #         color='black', horizontalalignment='right')
     # counter -= 1
 
     pupil_area = ses.videodata['pupil_area'][idx_V]
     handles.append(plot_norm_trace(
         ts_V[idx_V], pupil_area, counter, clr='purple'))
     # labels.append('Pupil Size')
-    ax.text(tstart, counter, 'Pupil Size', fontsize=9,
+    ax.text(tstart, counter, 'Pupil Size', 
             color='black', horizontalalignment='right')
     counter -= 1
 
@@ -182,7 +184,7 @@ def plot_behavioral_traces(ses, ax, tstart,tstop, nvideoPCs=8, counter=0):
     handles.append(plot_norm_trace(
         ts_V[idx_V], pupil_area, counter, clr='indigo'))
     # labels.append('Pupil X-pos')
-    ax.text(tstart, counter, 'Pupil X-pos', fontsize=9,
+    ax.text(tstart, counter, 'Pupil X-pos',
             color='black', horizontalalignment='right')
     counter -= 1
 
@@ -190,7 +192,7 @@ def plot_behavioral_traces(ses, ax, tstart,tstop, nvideoPCs=8, counter=0):
     handles.append(plot_norm_trace(
         ts_V[idx_V], pupil_area, counter, clr='plum'))
     # labels.append('Pupil Y-pos')
-    ax.text(tstart, counter, 'Pupil Y-pos', fontsize=9,
+    ax.text(tstart, counter, 'Pupil Y-pos', 
             color='black', horizontalalignment='right')
     counter -= 1
 
@@ -202,7 +204,7 @@ def plot_behavioral_traces(ses, ax, tstart,tstop, nvideoPCs=8, counter=0):
     handles.append(plot_norm_trace(
         ts_B[idx_B], runspeed, counter, clr='saddlebrown'))
     # labels.append('Running Speed')
-    ax.text(tstart, counter, 'Running Speed', fontsize=9,
+    ax.text(tstart, counter, 'Running Speed', 
             color='black', horizontalalignment='right')
     counter -= 1
 
@@ -219,8 +221,8 @@ def plot_neural_traces(ses, ax, tstart, tstop , neuronsel=None, counter=0, nexce
     scaleddata      = min_max_scaler.fit_transform(scaleddata)*2
 
     areas           = np.unique(ses.celldata['roi_name'])
-    labeled         = np.unique(ses.celldata['redcell'])
-    labeltext       = ['unlabeled', 'labeled',]
+    labeled         = np.unique(ses.celldata['labeled'])
+    # labeltext       = ['unlabeled', 'labeled',]
 
     if neuronsel is None:
         example_cells   = np.array([])
@@ -235,11 +237,11 @@ def plot_neural_traces(ses, ax, tstart, tstop , neuronsel=None, counter=0, nexce
     else:
         example_cells = np.array(neuronsel)
 
-    clrs = get_clr_labeled()
+    clrs = get_clr_labeled(labeled)
     for iarea, area in enumerate(areas):
         for ilabel, label in enumerate(labeled):
             example_cells_area_label = example_cells[np.logical_and(ses.celldata['roi_name'][example_cells] == area,
-                                                                    ses.celldata['redcell'][example_cells] == label)]
+                                                                    ses.celldata['labeled'][example_cells] == label)]
 
             excerpt = scaleddata[:, example_cells_area_label.astype(int)]
 
@@ -250,9 +252,9 @@ def plot_neural_traces(ses, ax, tstart, tstop , neuronsel=None, counter=0, nexce
                 ax.plot(ses.ts_F[np.logical_and(ses.ts_F > tstart, ses.ts_F < tstop)],
                         excerpt[:, i]+counter, linewidth=0.5, color=clrs[ilabel])
 
-            ax.text(tstart, counter+ncells/2, area + ' - ' +
-                    labeltext[ilabel], fontsize=9, color='black', horizontalalignment='right')
-
+            ax.text(tstart, counter+ncells/2, arealabeled_to_figlabels(area + label), color=clrs[ilabel], horizontalalignment='right')
+            # ax.text(tstart, counter+ncells/2, area + ' - ' +
+            #         labeltext[ilabel], fontsize=9, color='black', horizontalalignment='right')
     return counter
 
 
@@ -299,7 +301,7 @@ def plot_neural_raster(ses, ax, tstart, tstop, neuronsel=None, counter=0):
                 counter -= np.ceil(ncells/shrinkfactor)
 
                 ax.text(tstart, counter+ncells/shrinkfactor/2, area + ' - ' + labeltext[ilabel],
-                        fontsize=9, color='black', horizontalalignment='right')
+                        color='black', horizontalalignment='right')
 
     return counter
 
@@ -425,7 +427,7 @@ def plot_PCA_gratings(ses,size='runspeed',cellfilter=None,apply_zscore=True,plot
         # ax.legend(oris,title='Ori')
 
     # Put a legend to the right of the current axis
-    ax.legend(oris, title='Orientation', frameon=False, fontsize=6, title_fontsize=8,
+    ax.legend(oris, title='Orientation', frameon=False,
               loc='center left', bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()

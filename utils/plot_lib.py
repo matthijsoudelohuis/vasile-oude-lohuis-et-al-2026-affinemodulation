@@ -18,11 +18,47 @@ import copy
 import matplotlib.patches as patches
 
 def set_plot_basic_config():
-    plt.rcParams.update({'font.size': 7, 'xtick.labelsize': 6, 'ytick.labelsize': 6, 'axes.titlesize': 8,
-                     'axes.labelsize': 7,'axes.labelpad': 1, 'ytick.major.pad': 1, 'xtick.major.pad': 1})
-    desired_width = 600
-    pd.set_option('display.width', desired_width)
-    pd.set_option("display.max_columns", 14)
+    plt.rcParams.update({'font.size': 7, 
+                        'font.family': 'sans-serif', 
+                        'font.sans-serif': 'DejaVu Sans',
+                        
+                        'xtick.labelsize': 5,
+                        'ytick.labelsize': 5, 
+                        'ytick.major.pad': 0.8, 
+                        'xtick.major.pad': 0.8,
+                        'ytick.direction': 'out',     # direction: {in, out, inout}
+                        'xtick.direction': 'out',     # direction: {in, out, inout}
+                        'xtick.major.width': 0.8,
+                        'ytick.major.width': 0.8,
+                        'xtick.major.size': 1.5,       # major tick size in points
+                        'ytick.major.size': 1.5,
+
+                        'axes.titlesize': 6,
+                        'axes.titlepad': 3, 
+                        'axes.labelsize': 6,
+                        'axes.labelpad': 0.8, 
+                        'axes.linewidth': 0.8,     # edge line width
+                        
+                        'lines.linewidth': 1,
+                        'lines.linestyle': '-', 
+                        
+                        'legend.frameon': False,     # if True, draw the legend on a background patch
+                        'legend.fontsize': 5,        # legend.fontsize
+                        
+                        'figure.dpi': 600,       # figure dots per inch
+                        'figure.autolayout': True,
+                        'image.aspect': 'auto',
+                        #axes.facecolor:     white   # axes background color
+                        #axes.edgecolor:     black   # axes edge color
+                        #axes.grid:          False   # display grid or not
+                        #axes.grid.axis:     both    # which axis the grid should apply to
+                        #axes.grid.which:    major   # grid lines at {major, minor, both} ticks
+                        #axes.titlelocation: center  # alignment of the title: {left, right, center}
+                        #axes.titlesize:     large   # font size of the axes title
+                        #axes.titleweight:   normal  # font weight of title
+                        #axes.titlecolor:    auto    # color of the axes title, auto falls back to
+                                                    # text.color as default value
+                     })
 
 def my_savefig(fig,savedir,filename,formats=['png','pdf']):
     for fmt in formats:
@@ -429,11 +465,16 @@ def get_clr_area_pairs(areapairs):
                     ' ' : sns.xkcd_rgb['black']}
     return itemgetter(*areapairs)(palette)
 
-def get_clr_labeled():
+def get_clr_labeled(labeled=['unl','lab']):
+    palette       = {'unl': '#818181',
+                    'lab' : '#FF4C4D'}
     # clrs            = ['black','red']
-    return ['gray','indianred']
+    return itemgetter(*labeled)(palette)
+
 
 def arealabeled_to_figlabels(arealabeled):
+    if type(arealabeled) == str or type(arealabeled) == np.str_:
+        arealabeled = [arealabeled]
     # arealabeled_fig = np.array(np.shape(arealabeled),dtype=object)
     table       = {'V1unl': "$V1_{ND}$",
         'V1lab' : "$V1_{PM}$",
@@ -446,8 +487,17 @@ def arealabeled_to_figlabels(arealabeled):
         'ALunl':    "$AL_{ND}$",
         'ALlab' :   "$AL_{PM}$",
         'RSPunl' :  "$RSP_{ND}$",
-        'RSPlab' :  "$RSP_{PM}$"}
+        'RSPlab' :  "$RSP_{PM}$"
+        }
     return itemgetter(*arealabeled)(table)
+
+def arealabelpair_to_figlabel(arealabelpairs):
+    if type(arealabelpairs) == str or type(arealabelpairs) == np.str_:
+        arealabelpairs = [arealabelpairs]
+    
+    arealabelpair_fig = ['-'.join(arealabeled_to_figlabels([arealabel.split('-')[0],arealabel.split('-')[1]])) for arealabel in arealabelpairs]
+    return arealabelpair_fig
+
 
 def get_clr_labelpairs(pairs):
     palette       = {'unl-unl': sns.xkcd_rgb['grey'],
