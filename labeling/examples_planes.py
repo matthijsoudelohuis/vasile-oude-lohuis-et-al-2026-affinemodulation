@@ -14,7 +14,7 @@ from pathlib import Path
 from matplotlib.patches import Rectangle
 from cellpose import models
 from sklearn.preprocessing import minmax_scale
-
+from tqdm import tqdm
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from loaddata.get_data_folder import *

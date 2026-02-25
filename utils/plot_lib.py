@@ -16,9 +16,10 @@ import warnings
 from scipy.stats import pearsonr,ttest_rel
 import copy
 import matplotlib.patches as patches
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 def set_plot_basic_config():
-    plt.rcParams.update({'font.size': 7, 
+    plt.rcParams.update({'font.size': 6, 
                         'font.family': 'sans-serif', 
                         'font.sans-serif': 'DejaVu Sans',
                         
@@ -33,7 +34,7 @@ def set_plot_basic_config():
                         'xtick.major.size': 1.5,       # major tick size in points
                         'ytick.major.size': 1.5,
 
-                        'axes.titlesize': 6,
+                        'axes.titlesize': 7,
                         'axes.titlepad': 3, 
                         'axes.labelsize': 6,
                         'axes.labelpad': 0.8, 
@@ -286,28 +287,32 @@ def colored_line_between_pts(x, y, c, ax, **lc_kwargs):
 
     return ax.add_collection(lc)
 
-
-
-def plot_mod_plane(celldata,iplane=0,cellfield='modulation',
+def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
                     id_sig=True,id_looped=False,radiuslooped=False,radius=50):    
-    cmap = sns.color_palette('bwr',as_cmap=True)
-    cmap_lims       = np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99])))
-    cmap_lims       = np.round(np.array([-cmap_lims,cmap_lims]),1)
-    fig,axes        = plt.subplots(1,1,figsize=(3.3,3))
+    # cmap = sns.color_palette('bwr',as_cmap=True)
+    clrs = get_clr_interareacorrelation()
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", clrs)
+
+    # cmap_lims       = my_ceil(np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99]))),1)
+    cmap_lims       = my_ceil(np.max(np.abs(np.nanpercentile(celldata[cellfield], [2, 98]))),2)
+    cmap_lims       = np.array([-cmap_lims,cmap_lims])
+    cm = 1/2.54  # centimeters in inches
+    
+    fig,axes        = plt.subplots(1,1,figsize=(5*cm,3.7*cm))
     ax = axes
     idx_plane         = celldata['plane_idx']==iplane
     area = celldata['roi_name'][idx_plane].values[0]
     depth = celldata['depth'][idx_plane].values[0]
     # circlesize = (radius * 600/512)**2
     # circlesize = radius**2
-    rad = 5
+    rad = 3
     # sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
                 # hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=35,edgecolor="none")
     if id_sig:
         idx_pos = np.logical_and(celldata['sigmod']==1,idx_plane)
-        sns.scatterplot(data = celldata[idx_pos],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor="r",linewidth=1)
+        sns.scatterplot(data = celldata[idx_pos],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[2],linewidth=1)
         idx_neg = np.logical_and(celldata['sigmod']==-1,idx_plane)
-        sns.scatterplot(data = celldata[idx_neg],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor="b",linewidth=1)
+        sns.scatterplot(data = celldata[idx_neg],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[0],linewidth=1)
     
     sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
                 hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=rad**2,edgecolor=None,linewidth=0)
@@ -341,21 +346,26 @@ def plot_mod_plane(celldata,iplane=0,cellfield='modulation',
     ax.set_yticks([])
     ax.set_xlim([0,600])
     ax.set_ylim([0,600])
-    ax.set_title('%s, plane %d, depth %d (um)' % (area,iplane,depth),fontsize=10)
+    ax.set_title(r'Example %s plane (%d $\mu$m)' % (area,depth))
     ax.set_facecolor("grey")
     ax.invert_yaxis()
+    sns.despine(ax=ax, left=True, bottom=True, right=True, top=True)
 
     norm = plt.Normalize(cmap_lims[0],cmap_lims[1])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-
+    
     if np.any(celldata[cellfield][idx_plane]):
         ax.get_legend().remove()
         # Remove the legend and add a colorbar (optional)
         handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
         handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
         handle.ax.tick_params(labelsize=7)
-        handle.ax.set_ylabel('modulation',fontsize=8)
+        handle.ax.set_ylabel('correlation')
+
+    ax.add_artist(AnchoredSizeBar(ax.transData, 50,
+                "50 $\mu$m", loc=4, frameon=False))
+    
     plt.tight_layout()
 
     return fig
@@ -526,6 +536,10 @@ def get_clr_area_labeled(area_labeled):
         'RSPunl' : sns.xkcd_rgb['sienna'],
         'RSPlab' : sns.xkcd_rgb['crimson']}
     return itemgetter(*area_labeled)(palette)
+
+
+def get_clr_interareacorrelation():
+    return ['#0033B3','#FFFFFF','#E66804']
 
 def get_clr_arealabelpairs(arealabelpairs):
     palette       = {
