@@ -380,12 +380,15 @@ def add_corr_results(ax, x,y,pos=[0.2,0.1],fontsize=8):
     else: 
         ax.text(pos[0],pos[1],'p=n.s.',transform=ax.transAxes,ha='center',va='center',fontsize=fontsize,color='k')
 
-def add_paired_ttest_results(ax, x,y,pos=[0.2,0.1],fontsize=8):
+def add_paired_ttest_results(ax, x,y,pos=[0.2,0.1],fontsize=8,format='pval'):
     nas = np.logical_or(np.isnan(x), np.isnan(y))
     t,p = ttest_rel(x[~nas], y[~nas])
 
     print('Paired t-test: p=%.3f' % (p))
-    ax.text(pos[0],pos[1],'p<%s' % round_pval(p,return_ns=True),transform=ax.transAxes,ha='center',va='center',fontsize=fontsize,color='k') #ax.text(0.2,0.1,'p<0.05',transform=ax.transAxes,ha='center',va='center',fontsize=10,color='red')
+    if format == 'asterisks':
+        ax.text(pos[0],pos[1],get_sig_asterisks(p, return_ns=True),transform=ax.transAxes,ha='center',va='center',fontsize=fontsize,color='k') #ax.text(0.2,0.1,'p
+    elif format=='pval':
+        ax.text(pos[0],pos[1],'p<%s' % round_pval(p,return_ns=True),transform=ax.transAxes,ha='center',va='center',fontsize=fontsize,color='k') #ax.text(0.2,0.1,'p<0.05',transform=ax.transAxes,ha='center',va='center',fontsize=10,color='red')
 
 def my_legend_strip(ax):
     leg = ax.get_legend()

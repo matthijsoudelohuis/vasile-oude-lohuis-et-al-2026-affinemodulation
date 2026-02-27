@@ -20,5 +20,6 @@ def load_params():
                 maxrunspeed = 0.5, #maximum run speed in cm/s
                 
                 radius = 50, # distance in um to look for nearby cells
+                
                 )
     return params
