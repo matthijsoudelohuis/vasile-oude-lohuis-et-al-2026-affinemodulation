@@ -361,7 +361,7 @@ def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
         handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
         handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
         handle.ax.tick_params(labelsize=7)
-        handle.ax.set_ylabel('correlation')
+        handle.ax.set_ylabel(cellfield)
 
     ax.add_artist(AnchoredSizeBar(ax.transData, 50,
                 "50 $\mu$m", loc=4, frameon=False))

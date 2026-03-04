@@ -150,6 +150,13 @@ sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
 corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
 pvals = np.full((narealabelpairs,nSessions),np.nan)
+
+ndprimeboots = 250
+# ndprimeboots = 0
+dprimedata              = np.full((narealabelpairs,nCells),np.nan)
+dprimesig              = np.full((narealabelpairs,nCells),np.nan)
+params['dprime_alpha'] = 0.01
+
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
 
@@ -256,6 +263,30 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         corrdata_cells[ialp,idx_ses] = tempcorr
         tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
+
+        #dprime metric:
+        idx_K1              = np.logical_and(meanpopact < np.nanpercentile(meanpopact[idx_T_still],params['splitperc']),
+                                             idx_T_still)
+        idx_K2              = np.logical_and(meanpopact > np.nanpercentile(meanpopact[idx_T_still],100-params['splitperc']),
+                                             idx_T_still)
+        
+        dprime_ses = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
+
+        dprimedata[ialp,idx_ses] = dprime_ses[idx_N3]
+
+        if ndprimeboots:
+            bootdprimedata  = np.full((N,ndprimeboots),np.nan)
+            bootdprime_sig  = np.full((N),0)
+            for iboot in range(ndprimeboots):
+                idx_K1              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+                idx_K2              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+               
+                bootdprimedata[:,iboot] = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
+
+            bootdprime_sig[dprime_ses>np.percentile(bootdprimedata,100-(params['dprime_alpha']/2*100),axis=1)] = 1
+            bootdprime_sig[dprime_ses<np.percentile(bootdprimedata,params['dprime_alpha']/2*100,axis=1)] = -1
+
+            dprimesig[ialp,idx_ses] = bootdprime_sig[idx_N3]
 
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
@@ -368,6 +399,12 @@ boothist        = np.full((2,nhistbins,nradii,nboots),np.nan) # FF vs FB, +corr 
 nhasnearby      = np.full((2,nradii),np.nan) #number of labeled cells that have at least min_nearby unlabeled cells within radius
 min_nearby      = 2
 
+# sigdata = corrsig_cells
+# moddata = corrdata_cells
+
+sigdata = dprimesig
+moddata = dprimedata
+
 for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for different radii')):
     #For PMlab:
     hasnearby = np.full(len(idx_PMlab),False)
@@ -380,14 +417,14 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
     # print('PMlab: %d/%d' % (np.sum(hasnearby),len(hasnearby)))
     nhasnearby[iapl,irad] = np.sum(hasnearby)
 
-    loopfrac[iapl,0,irad] = np.sum(corrsig_cells[1,idx_PMlab_haswithinradius]==1) / len(idx_PMlab_haswithinradius)
-    loopfrac[iapl,1,irad] = np.sum(corrsig_cells[1,idx_PMlab_haswithinradius]==-1) / len(idx_PMlab_haswithinradius)
+    loopfrac[iapl,0,irad] = np.sum(sigdata[1,idx_PMlab_haswithinradius]==1) / len(idx_PMlab_haswithinradius)
+    loopfrac[iapl,1,irad] = np.sum(sigdata[1,idx_PMlab_haswithinradius]==-1) / len(idx_PMlab_haswithinradius)
     loopfrac[iapl,2,irad] = (loopfrac[iapl,0,irad]+loopfrac[iapl,1,irad])
     
-    loopmean[iapl,irad] = np.nanmean(corrdata_cells[1,idx_PMlab_haswithinradius])
-    loopmean_abs[iapl,irad] = np.nanmean(np.abs(corrdata_cells[1,idx_PMlab_haswithinradius]))
+    loopmean[iapl,irad] = np.nanmean(moddata[1,idx_PMlab_haswithinradius])
+    loopmean_abs[iapl,irad] = np.nanmean(np.abs(moddata[1,idx_PMlab_haswithinradius]))
 
-    histcounts      = np.histogram(corrdata_cells[1,idx_PMlab_haswithinradius],bins=binedges)[0]
+    histcounts      = np.histogram(moddata[1,idx_PMlab_haswithinradius],bins=binedges)[0]
     loophist[iapl,:,irad]   = np.cumsum(histcounts)/np.sum(histcounts)
 
     for iboot in range(nboots):
@@ -397,14 +434,14 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
             if hasnearby[iN]:
                 idx_boot[iN] = np.random.choice(idx_within_radius,1)
         idx_boot                    = idx_boot[hasnearby].astype(int)
-        bootfrac[iapl,0,irad,iboot] = np.sum(corrsig_cells[0,idx_boot]==1) / len(idx_boot) #compute fraction of sig pos for this boot
-        bootfrac[iapl,1,irad,iboot] = np.sum(corrsig_cells[0,idx_boot]==-1) / len(idx_boot)
+        bootfrac[iapl,0,irad,iboot] = np.sum(sigdata[0,idx_boot]==1) / len(idx_boot) #compute fraction of sig pos for this boot
+        bootfrac[iapl,1,irad,iboot] = np.sum(sigdata[0,idx_boot]==-1) / len(idx_boot)
         bootfrac[iapl,2,irad,iboot] = (bootfrac[iapl,0,irad,iboot]+bootfrac[iapl,1,irad,iboot])
 
-        bootmean[iapl,irad,iboot] = np.nanmean(corrdata_cells[0,idx_boot])
-        bootmean_abs[iapl,irad,iboot] = np.nanmean(np.abs(corrdata_cells[0,idx_boot]))
+        bootmean[iapl,irad,iboot] = np.nanmean(moddata[0,idx_boot])
+        bootmean_abs[iapl,irad,iboot] = np.nanmean(np.abs(moddata[0,idx_boot]))
 
-        histcounts = np.histogram(corrdata_cells[0,idx_boot],bins=binedges)[0]
+        histcounts = np.histogram(moddata[0,idx_boot],bins=binedges)[0]
         boothist[iapl,:,irad,iboot] = np.cumsum(histcounts)/np.sum(histcounts)
 
     #Now for V1lab:
@@ -419,13 +456,13 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
     # print('V1lab: %d/%d' % (np.sum(hasnearby),len(hasnearby)))
     nhasnearby[iapl,irad] = np.sum(hasnearby)
 
-    loopfrac[iapl,0,irad] = np.sum(corrsig_cells[3,idx_V1lab_haswithinradius]==1) / len(idx_V1lab_haswithinradius)
-    loopfrac[iapl,1,irad] = np.sum(corrsig_cells[3,idx_V1lab_haswithinradius]==-1) / len(idx_V1lab_haswithinradius)
+    loopfrac[iapl,0,irad] = np.sum(sigdata[3,idx_V1lab_haswithinradius]==1) / len(idx_V1lab_haswithinradius)
+    loopfrac[iapl,1,irad] = np.sum(sigdata[3,idx_V1lab_haswithinradius]==-1) / len(idx_V1lab_haswithinradius)
     loopfrac[iapl,2,irad] = (loopfrac[iapl,0,irad]+loopfrac[iapl,1,irad])
     
-    loopmean[iapl,irad] = np.nanmean(corrdata_cells[3,idx_V1lab_haswithinradius])
-    loopmean_abs[iapl,irad] = np.nanmean(np.abs(corrdata_cells[3,idx_V1lab_haswithinradius]))
-    histcounts      = np.histogram(corrdata_cells[3,idx_V1lab_haswithinradius],bins=binedges)[0]
+    loopmean[iapl,irad] = np.nanmean(moddata[3,idx_V1lab_haswithinradius])
+    loopmean_abs[iapl,irad] = np.nanmean(np.abs(moddata[3,idx_V1lab_haswithinradius]))
+    histcounts      = np.histogram(moddata[3,idx_V1lab_haswithinradius],bins=binedges)[0]
     loophist[iapl,:,irad]   = np.cumsum(histcounts)/np.sum(histcounts)
 
     for iboot in range(nboots):
@@ -435,13 +472,13 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
             if hasnearby[iN]:
                 idx_boot[iN] = np.random.choice(idx_within_radius,1)
         idx_boot                    = idx_boot[hasnearby].astype(int)
-        bootfrac[iapl,0,irad,iboot] = np.sum(corrsig_cells[2,idx_boot]==1) / len(idx_boot) #compute fraction of sig pos for this boot
-        bootfrac[iapl,1,irad,iboot] = np.sum(corrsig_cells[2,idx_boot]==-1) / len(idx_boot)
+        bootfrac[iapl,0,irad,iboot] = np.sum(sigdata[2,idx_boot]==1) / len(idx_boot) #compute fraction of sig pos for this boot
+        bootfrac[iapl,1,irad,iboot] = np.sum(sigdata[2,idx_boot]==-1) / len(idx_boot)
         bootfrac[iapl,2,irad,iboot] = (bootfrac[iapl,0,irad,iboot]+bootfrac[iapl,1,irad,iboot])
 
-        bootmean[iapl,irad,iboot] = np.nanmean(corrdata_cells[2,idx_boot])
-        bootmean_abs[iapl,irad,iboot] = np.nanmean(np.abs(corrdata_cells[2,idx_boot]))
-        histcounts = np.histogram(corrdata_cells[2,idx_boot],bins=binedges)[0]
+        bootmean[iapl,irad,iboot] = np.nanmean(moddata[2,idx_boot])
+        bootmean_abs[iapl,irad,iboot] = np.nanmean(np.abs(moddata[2,idx_boot]))
+        histcounts = np.histogram(moddata[2,idx_boot],bins=binedges)[0]
         boothist[iapl,:,irad,iboot] = np.cumsum(histcounts)/np.sum(histcounts)
 
 #%% Plotting bootstrapped results across different radii:
@@ -455,27 +492,35 @@ loopdata_subplots   = np.stack((loopmean,loopmean_abs,loopfrac[:,0],loopfrac[:,1
 bootdata_subplots   = np.stack((bootmean,bootmean_abs,bootfrac[:,0],bootfrac[:,1],bootfrac[:,2]),axis=2)
 nmetrics            = len(subplotlabels)
 params['ci']        = 95
-fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*5*cm,8*cm))
+fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*4*cm,7*cm))
 clrs_arealabelpairs = [ '#9933FF','#00CC99']
 
 for ialp in range(2):
     for imetric in range(nmetrics):
         axidx = imetric
         ax  = axes[ialp,axidx]
-        ax.plot(radii,loopdata_subplots[ialp,:,imetric],color=clrs_arealabelpairs[ialp],linewidth=lw,marker='.',markersize=8)
+        # ax.plot(radii,loopdata_subplots[ialp,:,imetric],color=clrs_arealabelpairs[ialp],linewidth=lw,marker='.',markersize=8)
+        ax.plot(radii,loopdata_subplots[ialp,:,imetric],color='r',linewidth=lw,marker='.',markersize=8)
         tempdata = bootdata_subplots[np.ix_([ialp],range(nradii),[imetric],range(nboots))].squeeze()
         
         ax.fill_between(radii, np.percentile(tempdata,(100-params['ci'])/2,axis=1), np.percentile(tempdata,params['ci']+(100-params['ci'])/2,axis=1), color='grey',alpha=0.25)
         ax_nticks(ax,3)
+        # for irad,radius in enumerate(radii):
+            # ax.text((irad+1)/len(radii),0,'n=%d'%nhasnearby[ialp,irad],fontsize=6,
+            #         ha='center',va='bottom',transform=ax.transAxes,color='grey',rotation=45)
         for irad,radius in enumerate(radii):
-            ax.text((irad+1)/len(radii),0,'n=%d'%nhasnearby[ialp,irad],fontsize=6,
-                    ha='center',va='bottom',transform=ax.transAxes,color='grey',rotation=45)
-        if ialp == 0:
-            axes[ialp,axidx].set_title(subplotlabels[imetric])
+            pval = np.sum(loopdata_subplots[ialp,irad,imetric] > bootdata_subplots[ialp,irad,imetric,:]) / nboots
+            pval = np.min([pval,1-pval])
+            # ax.text((irad+1)/len(radii),loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
+            ax.text(radius,loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
+                    fontsize=6,ha='left',va='center',color='k',rotation=45)
+        
+        axes[ialp,axidx].set_title(legendlabels[ialp] + ' ' + subplotlabels[imetric])
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii')
+# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime')
+# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_corr')
 
 
 #%% Plotting bootstrapped results at a specific radius:
