@@ -12,7 +12,7 @@ def load_params():
                 splitperc = 25, #Percentile of trials to split in high vs low activity
                 alpha_crossrate = 0.001,#threshold for correlation with cross area rate
                 activitymetric = 'difference', #mean, ratio or difference between labeled and unlabeled
-                
+                dprime_alpha = 0.01, #significance level for d prime
                 minrangeresp = 0.04, #minimum range of responses between stimulus conditions to include cell
                 
                 stilltrialsonly = True, #only use still trials for analysis

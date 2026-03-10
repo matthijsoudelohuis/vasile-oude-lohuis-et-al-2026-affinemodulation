@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from scipy.linalg import norm
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
@@ -14,9 +14,8 @@ from loaddata.get_data_folder import get_local_drive
 from loaddata.session_info import filter_sessions,load_sessions
 from utils.tuning import compute_tuning_wrapper,ori_remapping
 from utils.gain_lib import * 
-from utils.pair_lib import compute_pairwise_anatomical_distance,value_matching,filter_nearlabeled
 from utils.plot_lib import * #get all the fixed color schemes
-from utils.psth import compute_respmat,compute_tensor
+from utils.psth import compute_tensor
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\SplitTrials\\')
 
@@ -133,22 +132,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         mean_resp_split[ialp,:,:,idx_ses,:] = meanresp[idx_N3]
         error_resp_split[ialp,:,:,idx_ses,:] = errorresp[idx_N3]
 
-        # #Aligned:
-        # prefori                     = np.argmax(np.mean(meanresp,axis=2),axis=1)
-        # # prefori                     = np.argmax(meanresp[:,:,0],axis=1)
-
-        # meanresp_pref          = meanresp.copy()
-        # for n in range(N):
-        #     meanresp_pref[n,:,0] = np.roll(meanresp[n,:,0],-prefori[n])
-        #     meanresp_pref[n,:,1] = np.roll(meanresp[n,:,1],-prefori[n])
-
-        # # normalize by peak response
-        # tempmin,tempmax = meanresp_pref[:,:,0].min(axis=1,keepdims=True),meanresp_pref[:,:,0].max(axis=1,keepdims=True)
-        # meanresp_pref[:,:,0] = (meanresp_pref[:,:,0] - tempmin) / (tempmax - tempmin)
-        # meanresp_pref[:,:,1] = (meanresp_pref[:,:,1] - tempmin) / (tempmax - tempmin)
-
-        # mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
-
         #dprime metric:
         idx_K1              = np.logical_and(meanpopact < np.nanpercentile(meanpopact[idx_T_still],params['splitperc']),
                                              idx_T_still)
@@ -194,37 +177,47 @@ idx_examples = np.all((dprimedata[ialp,:]<np.nanpercentile(dprimedata[ialp,:],10
                        ),axis=0)
 
 #%% Plot the activity over time for example cells:
-example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
+# example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 # istim = 7
 # istim = 11
+# xanchor = -0.9
+xanchor = 2.4
+yanchor = 0
+clrs_low_high = ['blue','red']
 print(example_cells)
 for example_cell in example_cells:
     idx_N = np.where(celldata['cell_id']==example_cell)[0][0]
     ialp = np.where(~np.isnan(mean_resp_split[:,0,0,idx_N]))[0][0]
     istim = np.abs(np.diff(np.nanmean(mean_resp_split[ialp,:,:,idx_N,:],axis=-1),axis=1)).argmax()
-
     ustim = np.unique(sessions[ises].trialdata['Orientation'])
-    # x = mean_resp_split[ialp,:,0,idx_N]
     ymean = mean_resp_split[ialp,istim,:,idx_N,:]
-    # xerror = error_resp_split[ialp,:,0,idx_N]
     yerror = error_resp_split[ialp,istim,:,idx_N,:]
-    
-    # clrs_stimuli    = sns.color_palette('viridis',8)
-    # fig,axes = plt.subplots(1,2,figsize=(7*cm,3.5*cm))
-    fig,axes = plt.subplots(1,1,figsize=(3.5*cm,3*cm))
+    dprime = dprimedata[ialp,idx_N]
+
+    fig,axes = plt.subplots(1,1,figsize=(2.5*cm,2*cm))
     ax = axes
-    # ax = axes[0]
     handles = []
     for iactlevel in range(2):
         handles.append(shaded_error(t_axis,ymean[iactlevel,:],yerror[iactlevel,:],
-                                    color=clrs_arealabels_low_high[ialp,iactlevel],alpha=0.5))
-    ax.legend(handles,['Low','High'],frameon=False) 
+                                    color=clrs_low_high[iactlevel],alpha=0.5))
+                                    # color=clrs_arealabels_low_high[ialp,iactlevel],alpha=0.5))
+    ax.legend(handles,['Low','High'],frameon=False,reverse=True if dprime>0 else False) 
     my_legend_strip(ax)
-    ax.set_xlim([t_axis[0],t_axis[-1]])
+    ax.text(0.2,0.9,r'd`:%s%1.2f' % ('+' if dprime>0 else '',dprime),transform=ax.transAxes)
+    ax.plot([0,0.75],[0,0],color='black',ls='-',linewidth=2,solid_capstyle='butt')
+    ax.set_xlim([t_axis[0],np.max([t_axis[-1],xanchor+0.1])])
+    ax.set_ylim([-0.1,1.1])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Activity (dc/dF0)')
+
+    # ax.add_artist(AnchoredSizeBar(ax.transData, 1,
+    #               "1 Sec", loc=4, size_vertical=0.03,frameon=False))
+    # ax.text(xanchor,yanchor,'1 Sec',transform=ax.transAxes,fontsize=5,ha='left')
+    # ax.plot([xanchor,xanchor+1],[yanchor,yanchor],color='black',ls='-',linewidth=2,solid_capstyle='round')
+    ax.plot([xanchor,xanchor],[yanchor,yanchor+0.5],color='black',ls='-',linewidth=2,solid_capstyle='butt')
+    
+    ax.set_axis_off()
     ax_nticks(ax,4)
     plt.tight_layout()
     sns.despine(fig=fig, top=True, right=True, offset=2,trim=False)
-#     my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly'),'FF_FB_affinemodulation_Example_cell_%s' % example_cell)
-#     # my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly','BaselineCorrected'),'FF_FB_affinemodulation_Example_cell_%s' % example_cell, formats = ['png'])
+    # my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly'),'Tensor_modulation_Example_cell_%s' % example_cell)

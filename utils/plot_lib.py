@@ -99,7 +99,7 @@ def shaded_error(x,y,yerror=None,ax=None,center='mean',error='std',color='black'
         yerror = np.array(yerror)
 
     h, = ax.plot(x,ycenter,color=color,linestyle=linestyle,label=label,linewidth=linewidth)
-    ax.fill_between(x, ycenter-yerror, ycenter+yerror,color=color,alpha=alpha)
+    ax.fill_between(x, ycenter-yerror, ycenter+yerror,color=color,alpha=alpha,edgecolor='none')
 
     return h
 
