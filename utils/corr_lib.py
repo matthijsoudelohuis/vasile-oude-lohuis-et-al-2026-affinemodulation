@@ -150,10 +150,11 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
         elif sessions[ises].sessiondata['protocol'][0]=='GR':
             [N,K]                           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
             oris                            = np.sort(sessions[ises].trialdata['Orientation'].unique())
-            tf_stationary                   = sessions[ises].respmat_runspeed<2 if filter_stationary else np.ones(K,bool)
-            resp_meanori,respmat_res        = mean_resp_gr(sessions[ises],trialfilter=tf_stationary)
+            tf_still                   = np.logical_and(sessions[ises].respmat_runspeed<0.5,sessions[ises].respmat_videome<0.2) if filter_stationary else np.ones(K,bool)
+            # tf_still                   = sessions[ises].respmat_runspeed<0.5 if filter_stationary else np.ones(K,bool)
+            resp_meanori,respmat_res        = mean_resp_gr(sessions[ises],trialfilter=tf_still)
             prefori                         = oris[np.argmax(resp_meanori,axis=1)]
-            trial_ori   = sessions[ises].trialdata['Orientation'][tf_stationary]
+            trial_ori   = sessions[ises].trialdata['Orientation'][tf_still]
 
             sessions[ises].delta_pref       = np.abs(np.mod(np.subtract.outer(prefori, prefori),180))
             
@@ -175,7 +176,7 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
                     assert remove_rank > 0, 'remove_rank must be > 0'	
                     
                     respmat_res = copy.deepcopy(sessions[ises].respmat)
-                    respmat_res = respmat_res[:,tf_stationary]
+                    respmat_res = respmat_res[:,tf_still]
                     respmat_res = zscore(respmat_res,axis=1)
                     
                     # for iarea,area in enumerate(sessions[ises].celldata['roi_name'].unique()):
@@ -204,8 +205,9 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
             # Compute per stimulus, then average:
             noise_corr = np.empty((N,N,len(oris)))  
             for i,ori in enumerate(oris):
+                # print(np.sum(trial_ori==ori))
                 noise_corr[:,:,i] = np.corrcoef(respmat_res[:,trial_ori==ori])
-            sessions[ises].noise_corr       = np.mean(noise_corr,axis=2)
+            sessions[ises].noise_corr       = np.nanmean(noise_corr,axis=2)
 
             idx_triu = np.tri(N,N,k=0)==1 #index only upper triangular part
             if uppertriangular:
@@ -226,8 +228,8 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
             [N,K]                           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
             oris                            = np.sort(pd.Series.unique(sessions[ises].trialdata['centerOrientation']))
             speeds                          = np.sort(pd.Series.unique(sessions[ises].trialdata['centerSpeed']))
-            tf_stationary                     = sessions[ises].respmat_runspeed<2 if filter_stationary else np.ones(K,bool)
-            resp_mean,respmat_res           = mean_resp_gn(sessions[ises],tf_stationary)
+            tf_still                   = np.logical_and(sessions[ises].respmat_runspeed<0.5,sessions[ises].respmat_videome<0.2) if filter_stationary else np.ones(K,bool)
+            resp_mean,respmat_res           = mean_resp_gn(sessions[ises],tf_still)
             prefori, prefspeed              = np.unravel_index(resp_mean.reshape(N,-1).argmax(axis=1), (len(oris), len(speeds)))
             sessions[ises].prefori          = oris[prefori]
             sessions[ises].prefspeed        = speeds[prefspeed]
@@ -247,7 +249,7 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
                 if remove_method in ['PCA','FA','RRR']:
                     assert remove_rank > 0, 'remove_rank must be > 0'	
                     respmat_res = copy.deepcopy(sessions[ises].respmat)
-                    # respmat_res = respmat_res[:,tf_stationary]
+                    # respmat_res = respmat_res[:,tf_still]
                     respmat_res = zscore(respmat_res,axis=1)
 
                     trial_ori   = sessions[ises].trialdata['centerOrientation']
@@ -296,6 +298,7 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
 
 def hist_corr_areas_labeling(sessions,corr_type='trace_corr',filternear=True,minNcells=10, 
                         areapairs=' ',layerpairs=' ',projpairs=' ',noise_thr=100,valuematching=None,
+                        radius=50,
                         zscore=False,binres=0.01):
     # areas               = ['V1','PM']
     # redcells            = [0,1]
@@ -344,7 +347,7 @@ def hist_corr_areas_labeling(sessions,corr_type='trace_corr',filternear=True,min
                 matchfilter = np.ones((len(sessions[ises].celldata),len(sessions[ises].celldata))).astype(bool)
 
             if filternear:
-                nearfilter      = filter_nearlabeled(sessions[ises],radius=50)
+                nearfilter      = filter_nearlabeled(sessions[ises],radius=radius)
                 nearfilter      = np.meshgrid(nearfilter,nearfilter)
                 nearfilter      = np.logical_and(nearfilter[0],nearfilter[1])
             else: 
@@ -386,8 +389,6 @@ def hist_corr_areas_labeling(sessions,corr_type='trace_corr',filternear=True,min
                                                 projfilter,proxfilter,nanfilter,nearfilter,rffilter),axis=0)
 
                         if np.sum(np.any(cellfilter,axis=0))>minNcells and np.sum(np.any(cellfilter,axis=1))>minNcells:
-                            # if ipp==3:
-                                # print(np.sum(cellfilter))
                             data      = corrdata[cellfilter].flatten()
 
                             histcorr[:,ises,iap,ilp,ipp]    = np.histogram(data,bins=binedges,density=True)[0]

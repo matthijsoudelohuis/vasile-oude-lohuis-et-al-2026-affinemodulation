@@ -693,15 +693,12 @@ ndprimeboots            = 250
 # ndprimeboots = 0
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
-params['dprime_alpha'] = 0.01
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                # sessions[ises].respmat_runspeed < maxrunspeed)
     idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
     
@@ -831,7 +828,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         # fig,ax = plt.subplots()
         # ax.hist(bootdprimedata[0,:])
         # ax.axvline(dprime_ses[0],color='r')
-
 
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
@@ -1770,8 +1766,8 @@ ax = axes[2]
 for ialp,alp in enumerate(arealabelpairs):
     idx_N = np.all((          
                 rangeresp>params['minrangeresp'],
-                dprimesig[ialp,:]==1,
-                # sig_params_regress[:,ialp,0]!=1,
+                # dprimesig[ialp,:]==1,
+                sig_params_regress[:,ialp,0]!=1,
                 sig_params_regress[:,ialp,1]==1,
                 ),axis=0)
     xdata = np.nanmean(mean_resp_split[np.ix_([ialp],range(16),[0,1],idx_N)],axis=(0,2)).flatten()
@@ -1807,7 +1803,7 @@ ax.axhline(0,color='grey',ls='--',linewidth=1)
 #Stats: 
 idx_N = np.all((
                 rangeresp>params['minrangeresp'],
-                np.any(sig_params_regress[:,:,0]!=1,axis=1),
+                # np.any(sig_params_regress[:,:,0]!=1,axis=1),
                 np.any(sig_params_regress[:,:,1]==1,axis=1),
                 # dprimesig[ialp,:]==1,
                 ),axis=0)
@@ -1830,7 +1826,7 @@ if table.loc['response:arealabelpair','PR(>F)'] < 0.05:
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'FF_FB_Modulation_vs_Activity_%dGRsessions' % (nSessions))
+my_savefig(fig,savedir,'FF_FB_Modulation_vs_Activity_%dGRsessions' % (nSessions))
 
 
 #%% Is the effect similar for the two areas, but 

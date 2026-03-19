@@ -20,6 +20,8 @@ def load_params():
                 maxrunspeed = 0.5, #maximum run speed in cm/s
                 
                 radius = 50, # distance in um to look for nearby cells
-                
+                alpha_corrshuf = 0.0001,
+                method_multcomp = 'fdr_bh',
+
                 )
     return params
