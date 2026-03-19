@@ -298,7 +298,7 @@ def compute_signal_noise_correlation(sessions,uppertriangular=True,filter_statio
 
 def hist_corr_areas_labeling(sessions,corr_type='trace_corr',filternear=True,minNcells=10, 
                         areapairs=' ',layerpairs=' ',projpairs=' ',noise_thr=100,valuematching=None,
-                        radius=50,
+                        radius=50,min_nearbycells=None,
                         zscore=False,binres=0.01):
     # areas               = ['V1','PM']
     # redcells            = [0,1]
@@ -347,12 +347,20 @@ def hist_corr_areas_labeling(sessions,corr_type='trace_corr',filternear=True,min
                 matchfilter = np.ones((len(sessions[ises].celldata),len(sessions[ises].celldata))).astype(bool)
 
             if filternear:
-                nearfilter      = filter_nearlabeled(sessions[ises],radius=radius)
+                nearfilter      = filter_nearlabeled(sessions[ises],radius=radius,min_nearbycells=min_nearbycells)
                 nearfilter      = np.meshgrid(nearfilter,nearfilter)
                 nearfilter      = np.logical_and(nearfilter[0],nearfilter[1])
             else: 
                 nearfilter      = np.ones((len(sessions[ises].celldata),len(sessions[ises].celldata))).astype(bool)
 
+            # if min_nearbycells:
+            #     plt.imshow(nearfilter)
+            #     np.sum(nearfilter,axis=1)
+            #     signalfilter    = np.meshgrid(sessions[ises].celldata['noise_level']<noise_thr,sessions[ises].celldata['noise_level']<noise_thr)
+            #     signalfilter    = np.logical_and(signalfilter[0],signalfilter[1])
+
+            #     nearfilter      = np.logical_and(nearfilter,filter_nearlabeled(sessions[ises],min_nearbycells=min_nearbycells))
+            
             if zscore:
                 corrdata = corrdata/np.nanstd(corrdata,axis=None) - np.nanmean(corrdata,axis=None)
             
