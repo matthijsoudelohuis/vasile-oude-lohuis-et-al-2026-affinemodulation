@@ -10,7 +10,7 @@ from scipy import stats
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.get_data_folder import get_local_drive
@@ -86,7 +86,7 @@ for lh in leg.legend_handles:
     lh.set_visible(False)
 for text, color in zip(leg.texts, clrs):
     text.set_color(color)
-ax.set_xlabel('pref. direction (deg)')
+ax.set_xlabel(r'pref. direction ($\circ$)')
 ax.set_ylabel('density (a.u.)')
 ax.set_xticks(np.arange(0,360,45))
 ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
@@ -110,7 +110,7 @@ for lh in leg.legend_handles:
     lh.set_visible(False)
 for text, color in zip(leg.texts, clrs):
     text.set_color(color)
-ax.set_xlabel('pref. direction (deg)')
+ax.set_xlabel(r'pref. direction ($\circ$)')
 ax.set_xticks(np.arange(0,360,45))
 ax.set_xlim([0, 340]) #ax.set_xticks(np.arange(0,360,45))
 ax.set_title('PM',color='k',fontsize=7)
@@ -280,7 +280,7 @@ for ialp,alp in enumerate(arealabelpairs):
     if ialp==1:
         ax.set_xlabel('Trials')
     if ialp==0:
-        ax.set_ylabel('Mean activity (dc/dF0)')
+        ax.set_ylabel('Mean activity (events/F0)')
     ax.text(0.1,0.8,'r = %1.2f, p = %1.2f' % (stats.pearsonr(meanpopact_N1,meanpopact_N2)),transform=ax.transAxes,fontsize=6)
     ax_nticks(ax,4)
 plt.tight_layout()
@@ -300,9 +300,9 @@ np.random.seed(6)
 cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ['grey','grey','red'])
 cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ['blue','grey','red'])
 idx_T = np.where(np.all((
-                        # sessions[ises].respmat_videome < params['maxvideome'],
-                        # sessions[ises].respmat_runspeed < params['maxrunspeed'],
-                        sessions[ises].trialdata['stimCond']==2,
+                        sessions[ises].respmat_videome < params['maxvideome'],
+                        sessions[ises].respmat_runspeed < params['maxrunspeed'],
+                        # sessions[ises].trialdata['stimCond']==2,
                         ),axis=0))[0]
 print(len(idx_T))
 fig,axes = plt.subplots(2,1,figsize=(4.2*cm,6*cm))
@@ -352,8 +352,8 @@ for ialp,alp in enumerate(arealabelpairs):
     ax.text(0.07,0.07+bottomthr*2,'Bottom 25%',rotation=45,fontsize=6,ha='left',va='bottom')
     # ax.set_xlabel('%s' % arealabeled_to_figlabels([alp.split('-')[1]]),color=clrs_labeled[0])
     # ax.set_ylabel('%s' % arealabeled_to_figlabels([alp.split('-')[0]]), color=clrs_labeled[1])
-    ax.set_xlabel('%s activity' % arealabeled_to_figlabels([alp.split('-')[1]]),color='k')
-    ax.set_ylabel('%s activity' % arealabeled_to_figlabels([alp.split('-')[0]]), color='k')
+    ax.set_xlabel('%s (events/F0)' % arealabeled_to_figlabels([alp.split('-')[1]]),color='k')
+    ax.set_ylabel('%s (events/F0)' % arealabeled_to_figlabels([alp.split('-')[0]]), color='k')
     ax_nticks(ax, 3)
     ax.set_xticks([0,0.05,0.1])
     ax.set_yticks([0,0.05,0.1])
@@ -421,7 +421,7 @@ for ial,alp in enumerate(arealabelpairs):
         ax.set_ylabel('trial count')
     else: 
         ax.set_ylabel('')
-    ax.set_xlabel(arealabelpair_to_figlabel(alp)[0])
+    ax.set_xlabel('%s (events/F0)' % arealabelpair_to_figlabel(alp)[0])
     ax.set_title(titlelabels[ial])
     # ax_nticks(ax,3)
 plt.tight_layout()
@@ -456,8 +456,6 @@ for ial,alp in enumerate(arealabelpairs):
     elif params['activitymetric'] == 'difference': #Difference:
         meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
 
-    # allbins = np.arange(np.percentile(meanpopact,0),np.percentile(meanpopact,100),step)
-    # allbins = np.arange(np.percentile(meanpopact,1),np.percentile(meanpopact,99),step)
     allbins = np.arange(np.percentile(meanpopact,1),np.percentile(meanpopact,98),step)
 
     for istim,stim in enumerate(ustims):
@@ -468,25 +466,30 @@ for ial,alp in enumerate(arealabelpairs):
                                 sessions[ises].trialdata['Orientation'] == stim),axis=0)
         
         bins = allbins[allbins <= np.percentile(meanpopact[idx_T],params['splitperc'])+step]
-        # sns.histplot(data=meanpopact[idx_T],ax=ax,kde=False,bins = bins,color=clrs_arealabels_low_high[ial,0],edgecolor='none')
+
         sns.histplot(data=meanpopact[idx_T],ax=ax,kde=False,bins = bins,color=clrs_low_high[0],edgecolor='none')
         bins = allbins[np.logical_and(allbins >= np.percentile(meanpopact[idx_T],params['splitperc']), 
                                       allbins <= np.percentile(meanpopact[idx_T],100-params['splitperc'])+step)]
         sns.histplot(data=meanpopact[idx_T],ax=ax,kde=False,bins = bins,color='grey',edgecolor='none')
         bins = allbins[allbins > np.percentile(meanpopact[idx_T],100-params['splitperc'])]
-        # sns.histplot(data=meanpopact[idx_T],ax=ax,kde=False,bins = bins,color=clrs_arealabels_low_high[ial,1],edgecolor='none')
         sns.histplot(data=meanpopact[idx_T],ax=ax,kde=False,bins = bins,color=clrs_low_high[1],edgecolor='none')
 
         # ax.text(-0.05,80,'Low %s' % legendlabels[ial],color=clrs_arealabels_low_high[ial,0],fontsize=5)
         # ax.text(0.02,80,'High %s' % legendlabels[ial],color=clrs_arealabels_low_high[ial,1],fontsize=5)
-        ax.set_axis_off()
+        # ax.set_axis_off()
         ax.set_xlim(allbins[0],allbins[-1])
+        # ax.set_ylabel('')
+        # ax.set_yticks([])
+        ax.get_yaxis().set_visible(False)
         # ax.set_xticks([-0.05,0,0.06])
-        ax.set_title(stim,fontsize=4,ha='right',va='bottom')
+        ax.text(0.95,0.7,stim,fontsize=4,ha='right',va='bottom',transform=ax.transAxes)
+        # ax.set_title(stim,fontsize=4,ha='right',va='bottom')
+        ax.set_xlabel('%s (events/F0)' % arealabelpair_to_figlabel(alp)[0])
+
         # ax.plot([0,0],[0,1],color='k',lw=1,transform=ax.get_yaxis_transform())
     # ax_nticks(ax,3)
 # plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True, offset=2,trim=True)
+sns.despine(fig=fig, top=True, right=True, left=True,offset=2,trim=True)
 my_savefig(fig,savedir,'Hist_PopAct_FF_FB_perStim_%s' % sessiondata['session_id'][ises])
 
 #%%
