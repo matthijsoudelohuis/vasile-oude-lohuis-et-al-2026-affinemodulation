@@ -17,6 +17,13 @@ from loaddata.session import Session
 from utils.psth import compute_respmat
 from utils.plot_lib import * #get all the fixed color schemes
 
+def compute_dprime(X,Y):
+    #x and y are vectors of shape (nsamples)
+    return (np.nanmean(X) - np.nanmean(Y)) / np.sqrt((np.nanstd(X)**2 + np.nanstd(Y)**2)/2)
+
+def compute_dprime_mat(X,Y):
+    #X and Y are matrices of shape (nfeatures,nsamples)
+    return (np.nanmean(X,axis=1) - np.nanmean(Y,axis=1)) / np.sqrt((np.nanstd(X,axis=1)**2 + np.nanstd(Y,axis=1)**2)/2)
 
 def plot_respmat(orientations, datasets, labels, prefori):
     data = datasets[0]

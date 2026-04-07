@@ -306,13 +306,14 @@ def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
     # circlesize = (radius * 600/512)**2
     # circlesize = radius**2
     rad = 3
+    lwidth = 0.6
     # sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
                 # hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=35,edgecolor="none")
     if id_sig:
         idx_pos = np.logical_and(celldata['sigmod']==1,idx_plane)
-        sns.scatterplot(data = celldata[idx_pos],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[2],linewidth=1)
+        sns.scatterplot(data = celldata[idx_pos],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[2],linewidth=lwidth)
         idx_neg = np.logical_and(celldata['sigmod']==-1,idx_plane)
-        sns.scatterplot(data = celldata[idx_neg],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[0],linewidth=1)
+        sns.scatterplot(data = celldata[idx_neg],x='yloc',y='xloc',ax=ax,facecolor=None,s=(rad+2)**2,edgecolor=clrs[0],linewidth=lwidth)
     
     sns.scatterplot(data = celldata[idx_plane],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
                 hue=celldata[cellfield][idx_plane],ax=ax,palette=cmap,s=rad**2,edgecolor=None,linewidth=0)
@@ -321,12 +322,11 @@ def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
     idx_unlabeled = np.logical_and(celldata['redcell']==0,idx_plane)
 
     if id_looped:
-        sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                    hue=celldata[cellfield][idx_labeled],ax=ax,palette=cmap,s=rad**2,edgecolor="k",linewidth=1)
-
         sns.scatterplot(data = celldata[idx_unlabeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
-                    hue=celldata[cellfield][idx_unlabeled],ax=ax,palette=cmap,s=rad**2,edgecolor="none")
-    
+            hue=celldata[cellfield][idx_unlabeled],ax=ax,palette=cmap,s=rad**2,edgecolor="none")
+        sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',hue_norm=(cmap_lims[0],cmap_lims[1]),
+            hue=celldata[cellfield][idx_labeled],ax=ax,palette=cmap,s=rad**2,edgecolor="k",linewidth=lwidth)
+   
     if radiuslooped:
         for idx in np.where(idx_labeled)[0]:
             # 3. Create Circle Patch
@@ -334,7 +334,7 @@ def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
             center_x = celldata['xloc'].iloc[idx]
             center_y = celldata['yloc'].iloc[idx]
             # circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='k', linewidth=1)
-            circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=1)
+            circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=lwidth)
             ax.add_artist(circle)
             ax.set_aspect(1)
 

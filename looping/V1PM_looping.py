@@ -8,7 +8,7 @@ from tqdm import tqdm
 from scipy.stats import linregress,ranksums
 from scipy import stats
 
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *
@@ -23,8 +23,8 @@ savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF
 params  = load_params()
 set_plot_basic_config()
 cm      = 1/2.54  # centimeters in inches
-params['minrangeresp'] = 0.05
-params['alpha_crossrate'] = 0.0001
+# params['minrangeresp'] = 0.05
+# params['alpha_crossrate'] = 0.0001
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
@@ -141,8 +141,8 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-nboots                  = 0
-# nboots                  = 250
+nregressboots           = 0
+nregressboots           = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
@@ -167,16 +167,16 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
     
     for ialp,alp in enumerate(arealabelpairs):
         
-        idx_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-                                                    sessions[ises].celldata['nearby']
-                                                    ),axis=0))[0]
-        idx_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-                                                    sessions[ises].celldata['nearby']
-                                                    ),axis=0))[0]
+        # idx_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
+        #                                             sessions[ises].celldata['nearby']
+        #                                             ),axis=0))[0]
+        # idx_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
+        #                                             sessions[ises].celldata['nearby']
+        #                                             ),axis=0))[0]
 
-        # idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
+        idx_N1              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[0])[0]
         
-        # idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
+        idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
 
         idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
@@ -220,15 +220,15 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
             regressdata[n,:] = linregress(xdata,ydata)[:3]
         params_regress[idx_ses,ialp,:] = regressdata[idx_N3]
 
-        if nboots:
-            bootregressdata  = np.full((N,nboots,3),np.nan)
+        if nregressboots:
+            bootregressdata  = np.full((N,nregressboots,3),np.nan)
             bootregress_sig  = np.full((N,2),0)
-            for iboot in range(nboots):
+            for iboot in range(nregressboots):
                 meanrespboot            = np.empty([N,len(oris),2])
                 for i,ori in enumerate(oris):
                     idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
-                    idx_K1              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
-                    idx_K2              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*perc//100,replace=False)
+                    idx_K1              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*params['splitperc']//100,replace=False)
+                    idx_K2              = np.random.choice(np.where(idx_T)[0],size=np.sum(idx_T)*params['splitperc']//100,replace=False)
                     meanrespboot[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
                     meanrespboot[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
                 for n in range(N):
@@ -265,11 +265,15 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         corrsig_cells[ialp,idx_ses] = tempsig
 
         #dprime metric:
-        idx_K1              = np.logical_and(meanpopact < np.nanpercentile(meanpopact[idx_T_still],params['splitperc']),
-                                             idx_T_still)
-        idx_K2              = np.logical_and(meanpopact > np.nanpercentile(meanpopact[idx_T_still],100-params['splitperc']),
-                                             idx_T_still)
-        
+        idx_K1 = np.array([],dtype=int)
+        idx_K2 = np.array([],dtype=int)
+        for i,ori in enumerate(oris):
+            idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
+            idx_K1_T            = np.where(np.logical_and(idx_T,meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])))[0]
+            idx_K1              = np.concatenate((idx_K1,idx_K1_T))
+            idx_K2_T            = np.where(np.logical_and(idx_T,meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])))[0]
+            idx_K2              = np.concatenate((idx_K2,idx_K2_T))
+
         dprime_ses = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
 
         dprimedata[ialp,idx_ses] = dprime_ses[idx_N3]
@@ -292,6 +296,150 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
+#%%
+
+
+
+
+#%% Fraction of significant multiplicative and additively modulated cells for labeled and unlabeled cells:
+modsign = -1
+signlabel = 'excited' if modsign==1 else 'inhibited'
+orderversion = 1
+affinelabels = ['mult.','div.','add.','sub.']
+
+# if orderversion==1:
+#     affinelabels = ['mult.','div.','add.','sub.']
+# else:
+#     affinelabels = ['mult.','add.','div.','sub.']
+
+#%% Make the figure:
+clrs_arealabelpairs = ['grey','red','grey','red'] #for unlabeled and labeled cells, respectively
+titlelabels = ['FF','FB']
+ncomparisons = 4
+legendlabels = np.array(['PM$_{ND}$','PM$_{V1}$','V1$_{ND}$','V1$_{PM}$'])
+
+fig,axes = plt.subplots(1,2,figsize=(9*cm,3.8*cm))
+idxs = np.array([[0,1],[2,3]]) # FF 0 = unlabeled, 1 = labeled,FB: 2 unlabeled, 3 = labeled
+for idir,idx in enumerate(idxs):
+    ax = axes[idir]
+    sigmat = np.empty((3,2))
+    countmat = np.empty((3,2))
+    barwidth = 0.5
+    for iafftype in [0,1]: # 0 = multiplicative, 1 = additive
+        for iaffsign,affsign in enumerate([1,-1]): # 1 = positive, -1 = negative
+            fracs = np.empty((2))
+            # print(iafftype,affsign)
+            for iidx,ialp in enumerate(idx):
+                Nsig = np.sum(np.all((
+                            dprimesig[ialp,:]==modsign,
+                            sig_params_regress[:,ialp,iafftype]==affsign,
+                            rangeresp>params['minrangeresp'],
+                            celldata['nearby'],
+                                ),axis=0))
+                Ntotal = np.sum(np.all((
+                            ~np.isnan(sig_params_regress[:,ialp,iafftype]),
+                            dprimesig[ialp,:]==modsign,
+                            rangeresp>params['minrangeresp'],
+                            celldata['nearby'],
+                                ),axis=0))
+                sigmat[iafftype,iidx] = Nsig
+                countmat[iafftype,iidx] = Ntotal
+                fracs[iidx] = Nsig/Ntotal
+
+                if orderversion==1: 
+                    xpos = iaffsign*2 + iafftype*4 + (iidx*2-1) * barwidth/1.5
+                else: 
+                    xpos = iafftype*2 + iaffsign*4 + (iidx*2-1) * barwidth/1.5
+                # print(xpos)
+                ax.bar(xpos,fracs[iidx],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
+            
+            if np.any(fracs>0):
+                pval = stats.chi2_contingency([[sigmat[iafftype,0], countmat[iafftype,0]-sigmat[iafftype,0]],
+                                    [sigmat[iafftype,1], countmat[iafftype,1]-sigmat[iafftype,1]]])[1]
+                pval = np.clip(pval*ncomparisons,0,1)
+                if orderversion==1: 
+                    xpos = iaffsign*2 + iafftype*4 + (np.array([0,1])*2-1) * barwidth/1.5
+                else: 
+                    xpos = iafftype*2 + iaffsign*4 + (np.array([0,1])*2-1) * barwidth/1.5
+                add_stat_annotation(ax,xpos[0],xpos[1],np.max(fracs)+0.05,pval,h=0,fontsize=7)
+    ax.legend([plt.Rectangle((0,0),1,1,color=clrs_arealabelpairs[i]) for i in range(2)],
+              ['%s (n=%d)' % (legendlabels[i],countmat[0,i]) for i in range(2)],loc='best',fontsize=5) #legendlabels[idx] (),title='n=%d cells' % np.sum(countmat))
+    ax_nticks(ax,4)
+    ax.set_xticks(np.arange(4)*2,affinelabels)
+    ax.set_ylabel('Fraction of %s neurons' % signlabel)
+    ax.set_title(titlelabels[idir])
+    ax.set_yticks(np.arange(0,1.1,0.2))
+    ax.set_ylim([0,1])  
+plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True,offset=1,trim=False)
+my_savefig(fig,savedir,'Looped_FF_FB_Frac_affinemodulation_%s_cells_%dsessions' % (signlabel,nSessions))
+
+#%% Cumulative coefficients
+idxs = np.array([[0,1],[2,3]]) # FF 0 = unlabeled, 1 = labeled,FB: 2 unlabeled, 3 = labeled
+
+titlelabels = ['FF','FB']
+legendlabels = ['PM$_{ND}$','PM$_{V1}$','V1$_{ND}$','V1$_{PM}$']
+ncomparisons = 4
+for modsign in [-1,1]:
+    signlabel = 'excited' if modsign==1 else 'inhibited'
+
+    fig,axes = plt.subplots(2,2,figsize=(8*cm,8*cm),sharey=True)
+    for idir,idx in enumerate(idxs):
+        for iparam in range(2):
+            ax = axes[idir,iparam]
+            if iparam == 0:
+                ax.set_xlabel('Multiplicative Slope')
+                bins = np.arange(-0.15,5,0.015)
+                xlims = [0,3]
+                bins = np.arange(-0.2,3.5,0.015)
+                xlims = [bins[0],bins[-1]]
+                ax.axvline(1,color='grey',ls='--',linewidth=1)
+            else:
+                ax.set_xlabel('Additive Offset')
+                bins = np.arange(-0.01,0.06,0.0001)
+                xlims = [bins[0],bins[-1]]
+                ax.axvline(0,color='grey',ls='--',linewidth=1)
+            handles = []
+            for ialp in idx:
+                idx_N = np.all((
+                        rangeresp>params['minrangeresp'],
+                        celldata['nearby'],
+                        np.any(dprimesig==modsign,axis=0),
+                        ),axis=0)
+                datatoplot = np.clip(params_regress[idx_N,ialp,iparam],bins[1],bins[-2])
+                sns.histplot(data=datatoplot,element='step',
+                            color=clrs_arealabelpairs[ialp],
+                            alpha=1,linewidth=1.5,ax=ax,stat='probability',bins=bins,cumulative=True,fill=False)
+                handles.append(ax.plot(np.nanmean(datatoplot),0.95,markersize=6,
+                        color=clrs_arealabelpairs[ialp],marker='v')[0])
+                ncells = np.sum(~np.isnan(datatoplot))
+
+                ax.text(0.5, 0.1+ialp*0.1, '%s (n=%d)' % (legendlabels[ialp],ncells), 
+                        transform=ax.transAxes,fontsize=6,color=clrs_arealabelpairs[ialp])
+            ax.set_title('%s-%s' % (titlelabels[idir],signlabel))
+            h,pval = stats.mannwhitneyu(params_regress[idx_N,idx[0],iparam],
+                                    params_regress[idx_N,idx[1],iparam],nan_policy='omit')
+            pval = np.clip(pval*ncomparisons,0,1)  #bonferroni + clip
+
+            ax.text(0.45, 0.5, '%s' % (get_sig_asterisks(pval,return_ns=True)),
+                    transform=ax.transAxes,fontsize=10)
+            ax.set_yticks([0,0.5,1.0])
+            ax.set_xlim(xlims)
+            ax.set_ylim([0,1])
+            ax.set_ylabel('Cumulative fraction of cells')
+
+    plt.tight_layout()
+    sns.despine(fig=fig, top=True, right=True,offset=2)
+
+    my_savefig(fig,savedir,'looped_FF_FB_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions' % (signlabel,nSessions))
+
+#%% 
+
+
+
+
+
+
 #%% 
 ######  ####### ####### #######    ######     #    ######  ### #     #  #####  
 #     # #     # #     #    #       #     #   # #   #     #  #  #     # #     # 
@@ -309,7 +457,7 @@ rangeresp = np.nanmax(rangeresp,axis=(0,1))
 #%% Bootstrapped comparison of correlations and significant correlations with other area: 
 # The distribution of correlations is compared to the loop correlation distribution.
 # The fraction of significantly positive and negative as well. 
-radii           = np.arange(30,200,20)
+radii           = np.arange(40,100+10,10)
 nradii          = len(radii)
 
 idx_PMlab       = np.where(celldata['arealayerlabel'] == 'PMlabL2/3')[0]
@@ -380,7 +528,7 @@ for iN,N in tqdm(enumerate(idx_V1lab),total=nV1lab,desc='Finding V1 neurons near
 
 
 #%% 
-nboots          = 100
+nboots          = 250
 # nboots          = 1000
 
 loopfrac        = np.full((2,3,nradii),np.nan) # FF vs FB, +corr vs -corr vs modulated
@@ -391,7 +539,8 @@ bootfrac        = np.full((2,3,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 bootmean        = np.full((2,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 bootmean_abs    = np.full((2,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 
-binedges        = np.linspace(-1,1,50)
+binedges        = np.linspace(-1,1,25)
+# binedges        = np.linspace(0,1,50)
 nhistbins       = len(binedges)-1
 loophist        = np.full((2,nhistbins,nradii),np.nan) # FF vs FB, +corr vs -corr
 boothist        = np.full((2,nhistbins,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
@@ -484,7 +633,7 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
 #%% Plotting bootstrapped results across different radii:
 
 legendlabels        = ['FF','FB']
-axisbuffer          = 0.025
+axisbuffer          = 0.005
 lw                  = 2
 
 subplotlabels       = np.array(['Mean','Abs. Mean','Frac. Pos.','Frac. Neg.','Frac. Mod.'])
@@ -492,7 +641,7 @@ loopdata_subplots   = np.stack((loopmean,loopmean_abs,loopfrac[:,0],loopfrac[:,1
 bootdata_subplots   = np.stack((bootmean,bootmean_abs,bootfrac[:,0],bootfrac[:,1],bootfrac[:,2]),axis=2)
 nmetrics            = len(subplotlabels)
 params['ci']        = 95
-fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*4*cm,7*cm))
+fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*3.3*cm,6*cm))
 clrs_arealabelpairs = [ '#9933FF','#00CC99']
 
 for ialp in range(2):
@@ -512,32 +661,31 @@ for ialp in range(2):
             pval = np.sum(loopdata_subplots[ialp,irad,imetric] > bootdata_subplots[ialp,irad,imetric,:]) / nboots
             pval = np.min([pval,1-pval])
             # ax.text((irad+1)/len(radii),loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
-            ax.text(radius,loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
-                    fontsize=6,ha='left',va='center',color='k',rotation=45)
-        
+            ax.text(radius,loopdata_subplots[ialp,irad,imetric]-axisbuffer,get_sig_asterisks(pval),
+                    fontsize=7,ha='center',va='top',color='k',rotation=45)
+            # print(pval)
         axes[ialp,axidx].set_title(legendlabels[ialp] + ' ' + subplotlabels[imetric])
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime')
+my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime')
 # my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_corr')
 
 
 #%% Plotting bootstrapped results at a specific radius:
-
 radius              = 50
 irad                = np.where(radii==radius)[0][0]
 
 legendlabels        = ['FF','FB']
-axisbuffer          = 0.025
+axisbuffer          = 0.02
 lw                  = 2
-nbins               = 30
+nbins               = 15
 subplotlabels       = np.array(['Mean','Abs. Mean','Frac. Pos.','Frac. Neg.','Frac. Mod.'])
 loopdata_subplots   = np.stack((loopmean[:,irad],loopmean_abs[:,irad],loopfrac[:,0,irad],loopfrac[:,1,irad],loopfrac[:,2,irad]),axis=1)
 bootdata_subplots   = np.stack((bootmean[:,irad],bootmean_abs[:,irad],bootfrac[:,0,irad],bootfrac[:,1,irad],bootfrac[:,2,irad]),axis=1)
 nmetrics            = len(subplotlabels)
 
-fig,axes = plt.subplots(2,nmetrics+1,figsize=(nmetrics*5*cm,8*cm))
+fig,axes = plt.subplots(2,nmetrics+1,figsize=(nmetrics*3.3*cm,6*cm))
 
 for ialp in range(2):
     axes[ialp,0].plot(binedges[:-1],loophist[ialp,:,irad],color=clrs_arealabelpairs[ialp])
@@ -546,33 +694,84 @@ for ialp in range(2):
                     ax=axes[ialp,0],color='grey')
     axes[ialp,0].set_xlim([binedges[np.where(loophist[ialp,:]>0)[0][0]],binedges[np.where(loophist[ialp,:]>0.999)[0][0]]])
     axes[ialp,0].set_ylim([0,1])
-    axes[ialp,0].set_ylabel(legendlabels[ialp],fontsize=15,fontweight='bold',color=clrs_arealabelpairs[ialp])
+    axes[ialp,0].set_ylabel(legendlabels[ialp],fontsize=7,fontweight='bold',color=clrs_arealabelpairs[ialp])
     if ialp == 0:
-        axes[ialp,0].set_title('Corr. coeff.')
+        # axes[ialp,0].set_title('Corr. coeff.')
+        axes[ialp,0].set_title('Dprime')
     
     for imetric in range(nmetrics):
         axidx = imetric+1
         ax = axes[ialp,axidx]
-        ax.axvline(loopdata_subplots[ialp,imetric],color=clrs_arealabelpairs[ialp],linewidth=lw)
-        bins = np.linspace(np.percentile(bootdata_subplots[ialp,imetric],0)-axisbuffer,
-                           np.percentile(bootdata_subplots[ialp,imetric],100)+axisbuffer,nbins)
+        # ax.axvline(loopdata_subplots[ialp,imetric],color=clrs_arealabelpairs[ialp],linewidth=lw)
+        ax.axvline(loopdata_subplots[ialp,imetric],color='red',linewidth=lw)
+        bootmin,bootmax = np.percentile(bootdata_subplots[ialp,imetric],(0,100))
+        bins = np.linspace(bootmin-axisbuffer,bootmax+axisbuffer,nbins)
         sns.histplot(bootdata_subplots[ialp,imetric,:],ax=ax,bins=bins,element='step',stat='probability',color='grey')
         xlims = [np.min([np.percentile(bootdata_subplots[ialp,imetric],0),loopdata_subplots[ialp,imetric]])-axisbuffer,
                  np.max([np.percentile(bootdata_subplots[ialp,imetric],100),loopdata_subplots[ialp,imetric]])+axisbuffer]
         ax.set_xlim(xlims) #set lim to extremes of bootstrapped data + small buffer
         pval = np.sum(bootdata_subplots[ialp,imetric,:]>loopdata_subplots[ialp,imetric])/len(bootdata_subplots[ialp,imetric,:])
-        ax.text(loopdata_subplots[ialp,imetric],ax.get_ylim()[1]*0.8,get_sig_asterisks(np.min([pval,1-pval]),return_ns=True),fontsize=12,color=clrs_arealabelpairs[ialp])
+        ax.text(loopdata_subplots[ialp,imetric],ax.get_ylim()[1]*0.8,get_sig_asterisks(np.min([pval,1-pval]),return_ns=True),fontsize=9,
+                color='red',ha='right',va='center')
+                # color=clrs_arealabelpairs[ialp])
         if ialp == 0:
             ax.set_title(subplotlabels[imetric])
         ax_nticks(ax,3)
+        ax.set_ylabel('')
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radius%d' % (radius))
+my_savefig(fig,savedir,'Looped_Dprime_Modulations_Bootstrap_Radius%d' % (radius))
+
+#%% Evaluating potential confound of anatomical proximity:
+# To evaluate potential confounds due to anatomical inhomogeneities in modulations, we first measured the absolute difference in 
+# modulation as a function of distance between pairs of cells, regardless of their projection target. We found that cells that are
+# in close anatomical proximity are modulated more similarly (Fig. S10a,b).
+
+step                = 20
+binedges            = np.arange(0,300 + step,step)
+bincenters          = binedges[:-1] + step/2
+nbins              = len(bincenters)
+deltadprime         = np.full((2,nbins,nSessions),np.nan) #store absolute difference in modulation between pairs of cells for each session
+# deltadprime         = np.full((2,nradii,nSessions),np.nan) #store absolute difference in modulation between pairs of cells for each session
+moddata = dprimedata
+
+for ises in tqdm(range(nSessions),desc='Computing modulation difference as a function of distance'):
+    idx_ses = np.isin(celldata['session_id'],sessions[ises].session_id)
+    #get pairs of cells that are within this radius of each other:
+    if distancemetric == 'xyz': 
+        distmat = sessions[ises].distmat_xyz
+    elif distancemetric == 'xy':
+        distmat = sessions[ises].distmat_xy
+    deltadprime_FF = np.abs(moddata[0,idx_ses][:,None] - moddata[0,idx_ses][None,:])
+    deltadprime_FB = np.abs(moddata[2,idx_ses][:,None] - moddata[2,idx_ses][None,:])
+    for ibin,binedge in enumerate(binedges[:-1]):
+        idx_pairs = np.logical_and(distmat>binedges[ibin], distmat<=binedges[ibin+1])
+        # idx_pairs = np.where(np.triu(np.logical_and(distmat>radii[irad], distmat<=radii[irad+1]),1))[0]
+        # cellpairs = np.array(np.triu_indices(np.sum(idx_ses),1)).T[idx_pairs]
+        deltadprime[0,ibin,ises] = np.nanmean(deltadprime_FF[idx_pairs])
+        deltadprime[1,ibin,ises] = np.nanmean(deltadprime_FB[idx_pairs])
+
+#%% Show the delta prime as a function of distance between pairs of cells:
+fig,ax = plt.subplots(1,1,figsize=(4.3*cm,3.8*cm),sharex=True,sharey=True)
+handles = []
+for ialp,alp in enumerate(legendlabels):
+    handles.append(shaded_error(bincenters,deltadprime[ialp,:,:].T,error='sem',ax=ax,color=clrs_arealabelpairs[ialp],alpha=0.25))
+
+ax.set_xticks(np.arange(0,binedges[-1]+10,25))
+ax.set_xlabel('Distance between cell pairs (um)')
+ax_nticks(ax,5)
+ax.set_xlim([0,binedges[-1]])
+ax.set_ylabel('Delta dprime')
+ax.legend(handles,legendlabels,fontsize=6,loc='lower right',reverse=True)
+my_legend_strip(ax)
+plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True,offset=3)
+my_savefig(fig,savedir,'Delta_dprime_distance_V1PM_%dsessions' % nSessions)
 
 #%% Compute the fraction of looped neurons with at least two neighbours within a radius:
 legendlabels        = ['PM','V1']
-radii               = np.arange(0,100,10)
+radii               = np.arange(0,110,10)
 fraclooped          = np.zeros((2,len(radii)))
 
 for iradius,radius in enumerate(radii):
@@ -593,11 +792,10 @@ for ialp,alp in enumerate(legendlabels):
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-# my_savefig(fig,savedir,'Fraction_looped_2respneighbours_distance_V1PM_%dsessions' % nSessions)
+my_savefig(fig,savedir,'Fraction_looped_2respneighbours_distance_V1PM_%dsessions' % nSessions)
 
 #%% Compute the number of nonlooped neurons within radius
 legendlabels        = ['PM','V1']
-radii               = np.arange(0,300,10)
 nNonlooped          = np.zeros((2,len(radii)))
 
 for iradius,radius in enumerate(radii):
@@ -623,20 +821,27 @@ celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).res
 for ises in range(nSessions):
     #get index of all cells in this session
     idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
-    sessions[ises].celldata['modulation'] = np.nanmean(corrdata_cells[:,idx_ses],axis=0)
+    # sessions[ises].celldata['modulation'] = np.nanmean(corrdata_cells[:,idx_ses],axis=0)
+    sessions[ises].celldata['dprime'] = np.nanmean(dprimedata[:,idx_ses],axis=0)
 
 #%%
 ises = 1
 iplane = 3
-fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70) 
-filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
-# fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,id_sig=False,id_looped=True,radiuslooped=True,
+                     cellfield='dprime',radius=50) 
+filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
+fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 #%%
 ises = 7
 iplane = 6
-fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield='modulation',radius=70)
-filename = 'Example_plane_modulation_session%d_plane%d.pdf' % (ises,iplane)
+
+ises = 2
+iplane = 6
+
+fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,id_sig=False,id_looped=True,radiuslooped=True,
+                     cellfield='dprime',radius=50) 
+filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
 fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 
@@ -673,19 +878,26 @@ for ises in range(nSessions):
     idx_ses = np.isin(celldata['session_id'],sessions[ises].session_id)
 
     for ialp,alp in enumerate(arealabelpairs):
-        idx_N = np.all((idx_ses,
-                        ~np.isnan(corrsig_cells[ialp,:]),
+        idx_N = np.all((
+                        idx_ses,
+                        ~np.isnan(dprimesig[ialp,:]),
+                        # ~np.isnan(corrsig_cells[ialp,:]),
                         celldata['nearby'],
                         rangeresp>params['minrangeresp'],
+                        # rangeresp>0.05,
                         ),axis=0)
-        fracdata[ialp,0,ises] = np.sum(corrsig_cells[ialp,idx_N]==1) / np.sum(idx_N)
-        fracdata[ialp,1,ises] = np.sum(corrsig_cells[ialp,idx_N]==-1) / np.sum(idx_N)
+        # fracdata[ialp,0,ises] = np.sum(corrsig_cells[ialp,idx_N]==1) / np.sum(idx_N)
+        # fracdata[ialp,1,ises] = np.sum(corrsig_cells[ialp,idx_N]==-1) / np.sum(idx_N)
+
+        fracdata[ialp,0,ises] = np.sum(dprimesig[ialp,idx_N]==1) / np.sum(idx_N)
+        fracdata[ialp,1,ises] = np.sum(dprimesig[ialp,idx_N]==-1) / np.sum(idx_N)
+
         # fracdata[ialp,1,ises] = np.sum(corrsig_cells[ialp,idx_ses]==-1) / np.sum(~np.isnan(corrsig_cells[ialp,idx_ses]))
 
 clrs = ['black','red']
 axtitles = np.array(['FF: +corr','FF: -corr', 'FB: +corr','FB: -corr'])
 
-fig,axes = plt.subplots(1,4,figsize=(12,3))
+fig,axes = plt.subplots(1,4,figsize=(12*cm,3*cm))
 ax = axes[0]
 sns.barplot(data=fracdata[:2,0,:].T,palette=clrs,ax=ax,alpha=0.3)
 sns.stripplot(data=fracdata[:2,0,:].T,palette=clrs,ax=ax)
@@ -723,6 +935,10 @@ for iax,ax in enumerate(axes):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 # my_savefig(fig,savedir,'FF_FB_affinemodulation_FracSig_%dsessions' % (nSessions), formats = ['png'])
+
+# #%%
+# for ialp,alp in enumerate(arealabelpairs):
+#     plt.scatter(fracdata[ialp,0,:],fracdata[ialp,1,:])
 
 #%%
 legendlabels    = ['nonlooped','looped']
@@ -815,7 +1031,8 @@ for ialp,alp in enumerate(arealabelpairs):
     for isign,sign in enumerate([-1,1]):
         ax = axes[isign,ialp]
         idx_N = np.all((
-                        corrsig_cells[ialp,:]==sign,
+                        dprimesig[ialp,:]==sign,
+                        # corrsig_cells[ialp,:]==sign,
                         celldata['nearby'],
                         # celldata['noise_level']<maxnoiselevel,
                         rangeresp>params['minrangeresp'],

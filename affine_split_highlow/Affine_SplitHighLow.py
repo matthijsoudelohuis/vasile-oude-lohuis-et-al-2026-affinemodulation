@@ -492,16 +492,6 @@ for ial,alp in enumerate(arealabelpairs):
 sns.despine(fig=fig, top=True, right=True, left=True,offset=2,trim=True)
 my_savefig(fig,savedir,'Hist_PopAct_FF_FB_perStim_%s' % sessiondata['session_id'][ises])
 
-#%%
-
-def compute_dprime(X,Y):
-    #x and y are vectors of shape (nsamples)
-    return (np.nanmean(X) - np.nanmean(Y)) / np.sqrt((np.nanstd(X)**2 + np.nanstd(Y)**2)/2)
-
-def compute_dprime_mat(X,Y):
-    #X and Y are matrices of shape (nfeatures,nsamples)
-    return (np.nanmean(X,axis=1) - np.nanmean(Y,axis=1)) / np.sqrt((np.nanstd(X,axis=1)**2 + np.nanstd(Y,axis=1)**2)/2)
-
 
 #%% Correlate difference in activity metrics across sessions:
 
