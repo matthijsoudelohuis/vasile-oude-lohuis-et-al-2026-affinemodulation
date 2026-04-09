@@ -8,7 +8,7 @@ from tqdm import tqdm
 from scipy.stats import linregress,ranksums
 from scipy import stats
 
-os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *
@@ -128,6 +128,13 @@ arealabelpairs  = [
                     'PMlab-PMunl-V1labL2/3',
                     ]
 
+arealabelpairs  = [
+                    'V1lab-V1unl-PMunl',
+                    'V1lab-V1unl-PMlab',
+                    'PMlab-PMunl-V1unl',
+                    'PMlab-PMunl-V1lab',
+                    ]
+
 narealabelpairs         = len(arealabelpairs)
 
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
@@ -142,7 +149,7 @@ mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
 nregressboots           = 0
-nregressboots           = 250
+# nregressboots           = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
@@ -155,7 +162,6 @@ ndprimeboots = 250
 # ndprimeboots = 0
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
-params['dprime_alpha'] = 0.01
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
@@ -178,9 +184,10 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         
         idx_N2              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[1])[0]
 
-        idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
+        # idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
+        idx_N3              = np.where(sessions[ises].celldata['arealabel'] == alp.split('-')[2])[0]
 
-        if len(idx_N1) < params['minnneurons'] or len(idx_N2) < params['minnneurons'] or len(idx_N3) < params['minnneurons']:
+        if len(idx_N1) < params['minnneurons'] or len(idx_N2) < params['minnneurons']: #or len(idx_N3) < params['minnneurons']:
             continue
                 
         if params['activitymetric'] == 'mean':#Just mean activity:
@@ -372,14 +379,14 @@ for idir,idx in enumerate(idxs):
     ax.set_ylim([0,1])  
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=1,trim=False)
-my_savefig(fig,savedir,'Looped_FF_FB_Frac_affinemodulation_%s_cells_%dsessions' % (signlabel,nSessions))
+# my_savefig(fig,savedir,'Looped_FF_FB_Frac_affinemodulation_%s_cells_%dsessions' % (signlabel,nSessions))
 
 #%% Cumulative coefficients
 idxs = np.array([[0,1],[2,3]]) # FF 0 = unlabeled, 1 = labeled,FB: 2 unlabeled, 3 = labeled
 
 titlelabels = ['FF','FB']
 legendlabels = ['PM$_{ND}$','PM$_{V1}$','V1$_{ND}$','V1$_{PM}$']
-ncomparisons = 4
+ncomparisons = 2
 for modsign in [-1,1]:
     signlabel = 'excited' if modsign==1 else 'inhibited'
 
@@ -420,7 +427,7 @@ for modsign in [-1,1]:
             h,pval = stats.mannwhitneyu(params_regress[idx_N,idx[0],iparam],
                                     params_regress[idx_N,idx[1],iparam],nan_policy='omit')
             pval = np.clip(pval*ncomparisons,0,1)  #bonferroni + clip
-
+            # print(pval)
             ax.text(0.45, 0.5, '%s' % (get_sig_asterisks(pval,return_ns=True)),
                     transform=ax.transAxes,fontsize=10)
             ax.set_yticks([0,0.5,1.0])
@@ -431,7 +438,9 @@ for modsign in [-1,1]:
     plt.tight_layout()
     sns.despine(fig=fig, top=True, right=True,offset=2)
 
-    my_savefig(fig,savedir,'looped_FF_FB_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions' % (signlabel,nSessions))
+    # my_savefig(fig,savedir,'looped_FF_FB_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions' % (signlabel,nSessions))
+    my_savefig(fig,savedir,'looped_FF_FB_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions_allLayers' % (signlabel,nSessions))
+    # my_savefig(fig,savedir,'looped_FF_FB_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions_nofilter' % (signlabel,nSessions))
 
 #%% 
 
@@ -473,6 +482,19 @@ idx_V1lab       = np.where(np.all((
                                     rangeresp>=params['minrangeresp'],
                                     # celldata['noise_level']<params['maxnoiselevel'],
                                     ),axis=0))[0]
+
+# idx_PMlab       = np.where(np.all((
+#                                     celldata['arealabel'] == 'PMlab',
+#                                     rangeresp>=params['minrangeresp'],
+#                                     # celldata['noise_level']<params['maxnoiselevel'],
+#                                     ),axis=0))[0]
+# idx_V1lab       = np.where(np.all((
+#                                     celldata['arealabel'] == 'V1lab',
+#                                     rangeresp>=params['minrangeresp'],
+#                                     # celldata['noise_level']<params['maxnoiselevel'],
+#                                     ),axis=0))[0]
+
+
 nPMlab          = len(idx_PMlab)
 nV1lab          = len(idx_V1lab)
 idx_PMlab_allnear  = np.full((nPMlab,2,1000),np.nan) #store all unlabeled cell indices within radius
@@ -656,7 +678,7 @@ for ialp in range(2):
         ax_nticks(ax,3)
         # for irad,radius in enumerate(radii):
             # ax.text((irad+1)/len(radii),0,'n=%d'%nhasnearby[ialp,irad],fontsize=6,
-            #         ha='center',va='bottom',transform=ax.transAxes,color='grey',rotation=45)
+                    # ha='center',va='bottom',transform=ax.transAxes,color='grey',rotation=45)
         for irad,radius in enumerate(radii):
             pval = np.sum(loopdata_subplots[ialp,irad,imetric] > bootdata_subplots[ialp,irad,imetric,:]) / nboots
             pval = np.min([pval,1-pval])
@@ -668,8 +690,8 @@ for ialp in range(2):
 
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime')
-# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_corr')
+# my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime')
+my_savefig(fig,savedir,'Looped_Modulations_Bootstrap_Radii_dprime_allLayers')
 
 
 #%% Plotting bootstrapped results at a specific radius:
@@ -722,6 +744,7 @@ for ialp in range(2):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'Looped_Dprime_Modulations_Bootstrap_Radius%d' % (radius))
+# my_savefig(fig,savedir,'Looped_Dprime_Modulations_Bootstrap_Radius%d_alllayers' % (radius))
 
 #%% Evaluating potential confound of anatomical proximity:
 # To evaluate potential confounds due to anatomical inhomogeneities in modulations, we first measured the absolute difference in 
