@@ -17,6 +17,7 @@ from scipy.stats import pearsonr,ttest_rel
 import copy
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+from itertools import product
 
 def set_plot_basic_config():
     plt.rcParams.update({'font.size': 6, 
@@ -370,6 +371,81 @@ def plot_mod_plane(celldata,iplane=0,cellfield='correlation',
 
     return fig
 
+
+def plot_loop_plane(celldata,iplane=0,cellfield='correlation',
+                    filter_rangeresp=True,id_looped=False,radiuslooped=False,radius=50):    
+    # cmap = sns.color_palette('bwr',as_cmap=True)
+    clrs = ['#0033B3', "#CCCCCC", '#E66804']
+    # cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", clrs)
+
+    # cmap_lims       = my_ceil(np.max(np.abs(np.nanpercentile(celldata[cellfield], [1, 99]))),1)
+    # cmap_lims       = my_ceil(np.max(np.abs(np.nanpercentile(celldata[cellfield], [2, 98]))),2)
+    # cmap_lims       = np.array([-cmap_lims,cmap_lims])
+    cm = 1/2.54  # centimeters in inches
+    
+    fig,axes        = plt.subplots(1,1,figsize=(4.2*cm,3*cm))
+    ax = axes
+    if filter_rangeresp:
+        idx_plane         = np.logical_and(celldata['plane_idx']==iplane,celldata['rangeresp']>0.04)
+    else:
+        idx_plane         = celldata['plane_idx']==iplane
+    area = celldata['roi_name'][idx_plane].values[0]
+    depth = celldata['depth'][idx_plane].values[0]
+
+    rad = 2.8
+    lwidth = 0.5
+    for isig,sig in enumerate([-1,0,1]):
+        idx = np.logical_and(celldata['sigmod']==sig,idx_plane)
+        sns.scatterplot(data = celldata[idx],x='yloc',y='xloc',c=clrs[isig],ax=ax,s=rad**2,edgecolor=None,linewidth=0)
+ 
+    idx_labeled = np.logical_and(celldata['redcell']==1,idx_plane)
+    idx_unlabeled = np.logical_and(celldata['redcell']==0,idx_plane)
+
+    if id_looped:
+        # sns.scatterplot(data = celldata[idx_unlabeled],x='yloc',y='xloc',,c=None,ax=ax,s=rad**2,edgecolor="none")
+        sns.scatterplot(data = celldata[idx_labeled],x='yloc',y='xloc',c='None',ax=ax,s=rad**2,edgecolor="k",linewidth=lwidth)
+   
+    if radiuslooped:
+        for idx in np.where(idx_labeled)[0]:
+            # 3. Create Circle Patch
+            # The radius parameter corresponds to data units (x units)
+            center_x = celldata['xloc'].iloc[idx]
+            center_y = celldata['yloc'].iloc[idx]
+            # circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='k', linewidth=1)
+            circle = patches.Circle((center_y, center_x), radius, fill=False, edgecolor='k', linewidth=lwidth,linestyle=':')
+            ax.add_artist(circle)
+            ax.set_aspect(1)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.9, box.height * 0.9])  # Shrink current axis's height by 10% on the bottom
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim([0,600])
+    ax.set_ylim([0,600])
+    ax.set_title(r'Example %s plane (%d $\mu$m)' % (area,depth),fontsize=5)
+    ax.set_facecolor('#808080')
+    ax.invert_yaxis()
+    sns.despine(ax=ax, left=True, bottom=True, right=True, top=True)
+
+    # norm = plt.Normalize(cmap_lims[0],cmap_lims[1])
+    # sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
+    
+    # if np.any(celldata[cellfield][idx_plane]):
+    #     ax.get_legend().remove()
+    #     # Remove the legend and add a colorbar (optional)
+    #     handle = ax.figure.colorbar(sm,ax=ax,pad=0.02,shrink=0.5)
+    #     handle.ax.set_yticks([-cmap_lims[1],0,cmap_lims[1]])
+    #     handle.ax.tick_params(labelsize=7)
+    #     handle.ax.set_ylabel(cellfield)
+
+    ax.add_artist(AnchoredSizeBar(ax.transData, 50,
+                "50 $\mu$m", loc=4, frameon=False))
+
+    return fig
+
 def add_corr_results(ax, x,y,pos=[0.2,0.1],fontsize=8):
     nas = np.logical_or(np.isnan(x), np.isnan(y))
     r,p = pearsonr(x[~nas], y[~nas])
@@ -658,3 +734,44 @@ def get_clr_animal_id(animal_ids):
     #    'LPE12385'], dtype=object)
     
     return clrs
+
+
+def nd_array_to_dataframe(data, dim_names=None):
+    """
+    Convert an N-dimensional numpy array to a pandas DataFrame.
+    
+    Parameters:
+    -----------
+    data : numpy.ndarray
+        The N-dimensional array to convert
+    dim_names : list, optional
+        Names for each dimension. If None, will use ['dim0', 'dim1', ...]
+    
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with columns for the value and each dimension index
+    """
+    # Get the shape of the array
+    shape = data.shape
+    ndim = len(shape)
+    
+    # Create default dimension names if not provided
+    if dim_names is None:
+        dim_names = [f'dim{i}' for i in range(ndim)]
+    elif len(dim_names) != ndim:
+        raise ValueError(f"Length of dim_names ({len(dim_names)}) must match number of dimensions ({ndim})")
+    
+    # Create all possible index combinations
+    indices = list(product(*[range(s) for s in shape]))
+    
+    # Create a dictionary to store the data
+    df_dict = {name: [idx[i] for idx in indices] for i, name in enumerate(dim_names)}
+    
+    # Add the values
+    df_dict['value'] = [data[idx] for idx in indices]
+    
+    # Create the DataFrame
+    df = pd.DataFrame(df_dict)
+    
+    return df
