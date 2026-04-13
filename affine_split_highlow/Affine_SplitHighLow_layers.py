@@ -12,7 +12,7 @@ from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr,ks_2samp
 from scipy import stats
 from statsmodels.formula.api import ols
 
-os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.get_data_folder import get_local_drive
@@ -114,8 +114,8 @@ legendlabels            = np.array(['V1->PML23','V1->PML5'])
 clrs_arealabelpairs = sns.color_palette('dark',4)[2:]
 direction = 'FF'
 
-
 #%% Show tuning curve when activity in the other area is low or high (only still trials)
+
 narealabelpairs         = len(arealabelpairs)
 
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
@@ -129,14 +129,15 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-nboots                  = 0
-# nboots                  = 250
+# nboots                  = 0
+nboots                  = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
-#Correlation output:
-corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
-corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
+ndprimeboots            = 250
+# ndprimeboots = 0
+dprimedata              = np.full((narealabelpairs,nCells),np.nan)
+dprimesig              = np.full((narealabelpairs,nCells),np.nan)
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
@@ -153,14 +154,9 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         idx_N3              = np.where(sessions[ises].celldata[celldatafields[2]] == alp.split('-')[2])[0]
 
-        # subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-        # idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-        # idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
-
         if len(idx_N1) < params['minnneurons'] or len(idx_N2) < params['minnneurons']:
-            print('Not enough neurons (%d) in the target area session %d, area pair %s' % (len(idx_N1),ises,alp))
             continue
-
+        
         if params['activitymetric'] == 'mean':#Just mean activity:
             meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
         elif params['activitymetric'] == 'ratio': #Ratio:
@@ -195,7 +191,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         for n in range(N):
             xdata = meanresp[n,:,0]
             ydata = meanresp[n,:,1]
-            regressdata[n,:] = linregress(xdata,ydata)[:3]
+            regressdata[n,:] = stats.linregress(xdata,ydata)[:3]
         params_regress[idx_ses,ialp,:] = regressdata[idx_N3]
 
         if nboots:
@@ -210,7 +206,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
                     meanrespboot[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
                     meanrespboot[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
                 for n in range(N):
-                    bootregressdata[n,iboot,:] = linregress(meanrespboot[n,:,0],meanrespboot[n,:,1])[:3]
+                    bootregressdata[n,iboot,:] = stats.linregress(meanrespboot[n,:,0],meanrespboot[n,:,1])[:3]
 
             bootregress_sig[regressdata[:,0]>np.percentile(bootregressdata[:,:,0],97.5,axis=1),0] = 1
             bootregress_sig[regressdata[:,0]<np.percentile(bootregressdata[:,:,0],2.5,axis=1),0] = -1
@@ -227,65 +223,85 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
             meanresp_pref[n,:,0] = np.roll(meanresp[n,:,0],-prefori[n])
             meanresp_pref[n,:,1] = np.roll(meanresp[n,:,1],-prefori[n])
 
-        # normalize by peak response
-        tempmin,tempmax = meanresp_pref[:,:,0].min(axis=1,keepdims=True),meanresp_pref[:,:,0].max(axis=1,keepdims=True)
-        meanresp_pref[:,:,0] = (meanresp_pref[:,:,0] - tempmin) / (tempmax - tempmin)
-        meanresp_pref[:,:,1] = (meanresp_pref[:,:,1] - tempmin) / (tempmax - tempmin)
-
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
-        tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
-        tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
+        tempcorr          = np.array([stats.pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
+        tempsig          = np.array([stats.pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
         corrdata_cells[ialp,idx_ses] = tempcorr
         tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
         corrsig_cells[ialp,idx_ses] = tempsig
 
+        #dprime metric:
+        idx_K1 = np.array([],dtype=int)
+        idx_K2 = np.array([],dtype=int)
+        for i,ori in enumerate(oris):
+            idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
+            idx_K1_T = np.where(np.logical_and(idx_T,meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])))[0]
+            idx_K1              = np.concatenate((idx_K1,idx_K1_T))
+            idx_K2_T = np.where(np.logical_and(idx_T,meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])))[0]
+            idx_K2              = np.concatenate((idx_K2,idx_K2_T))
+        
+        dprime_ses = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
+
+        dprimedata[ialp,idx_ses] = dprime_ses[idx_N3]
+
+        if ndprimeboots:
+            bootdprimedata  = np.full((N,ndprimeboots),np.nan)
+            bootdprime_sig  = np.full((N),0)
+            for iboot in range(ndprimeboots):
+                idx_K1              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+                idx_K2              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+               
+                bootdprimedata[:,iboot] = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
+
+            bootdprime_sig[dprime_ses>np.percentile(bootdprimedata,100-(params['dprime_alpha']/2*100),axis=1)] = 1
+            bootdprime_sig[dprime_ses<np.percentile(bootdprimedata,params['dprime_alpha']/2*100,axis=1)] = -1
+
+            dprimesig[ialp,idx_ses] = bootdprime_sig[idx_N3]
+        
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
-
-# print(np.sum(~np.isnan(corrdata_cells[0,:])))
-# print(np.sum(~np.isnan(corrdata_cells[1,:])))
 
 #%% Store results in celldata
 celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 for ises in range(nSessions):
     #get index of all cells in this session
     idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
-    sessions[ises].celldata['correlation_PML23']   = corrdata_cells[0,idx_ses]
-    sessions[ises].celldata['correlation_PML5']   = corrdata_cells[1,idx_ses]
-    sessions[ises].celldata['sigmod_FBPML23']       = corrsig_cells[0,idx_ses]
-    sessions[ises].celldata['sigmod_FBPML5']       = corrsig_cells[1,idx_ses]
+    sessions[ises].celldata['dprime_PML23']   = dprimedata[0,idx_ses]
+    sessions[ises].celldata['dprime_PML5']   = dprimedata[1,idx_ses]
+    sessions[ises].celldata['sigmod_FBPML23']       = dprimesig[0,idx_ses]
+    sessions[ises].celldata['sigmod_FBPML5']       = dprimesig[1,idx_ses]
 celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
 #%% Feedback modulated cells:
 ises = 2
 iplane = 3
-cellfield = 'correlation_PML23'
+cellfield = 'dprime_PML23'
 fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield=cellfield,
                      id_sig=False,id_looped=False,radiuslooped=False,radius=50) 
-filename = 'Example_plane_correlation_session%d_plane%d.pdf' % (ises,iplane)
+filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
 # fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
-cellfield = 'correlation_PML5'
+cellfield = 'dprime_PML5'
 fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield=cellfield,
                      id_sig=False,id_looped=False,radiuslooped=False,radius=50) 
-filename = 'Example_plane_correlation_V1L5_session%d_plane%d.pdf' % (ises,iplane)
+filename = 'Example_plane_dprime_V1L5_session%d_plane%d.pdf' % (ises,iplane)
 # fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 #%%
 ises = 7
 iplane =4
-cellfield = 'correlation_PML23'
+cellfield = 'dprime_PML23'
 fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield=cellfield,
                      id_sig=False,id_looped=False,radiuslooped=False,radius=50) 
-filename = 'Example_plane_correlation_session%d_plane%d.pdf' % (ises,iplane)
+filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
 # fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
-cellfield = 'correlation_PML5'
+cellfield = 'dprime_PML5'
 fig = plot_mod_plane(sessions[ises].celldata,iplane=iplane,cellfield=cellfield,
                      id_sig=False,id_looped=False,radiuslooped=False,radius=50) 
-filename = 'Example_plane_correlation_V1L5_session%d_plane%d.pdf' % (ises,iplane)
+filename = 'Example_plane_dprime_V1L5_session%d_plane%d.pdf' % (ises,iplane)
 # fig.savefig(os.path.join(savedir,filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 
@@ -294,20 +310,20 @@ filename = 'Example_plane_correlation_V1L5_session%d_plane%d.pdf' % (ises,iplane
 fig,axes = plt.subplots(1,1,figsize=(4*cm,3.7*cm))
 # ax = axes[ialp]
 ax = axes
-# ax.scatter(corrdata_cells[0,:],corrdata_cells[1,:],color='#666666',marker='.',s=3)
-sns.regplot(x=corrdata_cells[0,:],y=corrdata_cells[1,:],
+# ax.scatter(dprimedata[0,:],dprimedata[1,:],color='#666666',marker='.',s=3)
+sns.regplot(x=dprimedata[0,:],y=dprimedata[1,:],
             scatter_kws={'s':2, 'alpha':0.5,'marker':'.','edgecolor':'none','color':'#666666'},
             line_kws={'color':"#313DCA",'lw':1,'alpha':1},ci=95,ax=ax)
 ax_nticks(ax,4)
-ax.set_xlabel('Correlation PM-L23')
-ax.set_ylabel('Correlation PM-L5')
+ax.set_xlabel('DPrime PM-L23')
+ax.set_ylabel('DPrime PM-L5')
 ax.set_xticks(np.arange(-1,1.1,0.25))
 ax.set_yticks(np.arange(-1,1.1,0.25))
 ax.set_ylim([-.25,0.6])
 ax.set_xlim([-.25,0.6])
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Correlation_%s_DiffLayers_%dsessions' % (direction,nSessions))
+my_savefig(fig,savedir,'dprime_%s_DiffLayers_%dsessions' % (direction,nSessions))
 
 #%% Show pie chart of significant correlation for feedforward and feedback:
 sigmat = np.empty((3,narealabelpairs))
@@ -318,9 +334,9 @@ signlabels = ['Neg','Pos','None']
 clrs_signs = ['#0033B3','#E66804','#808080']
 for ialp,alp in enumerate(arealabelpairs):
     for isign,sign in enumerate(signorder):
-        idx_N = ~np.isnan(corrdata_cells[ialp,:])
+        idx_N = ~np.isnan(dprimedata[ialp,:])
 
-        sigmat[isign,ialp] = np.sum(corrsig_cells[ialp,idx_N]==sign) / np.sum(idx_N)
+        sigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N)
 
 #Make the figure:
 fig,axes = plt.subplots(1,2,figsize=(7*cm,4*cm))
@@ -329,76 +345,145 @@ for ialp,alp in enumerate(arealabelpairs):
     ax.pie([sigmat[0,ialp],sigmat[1,ialp],sigmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
             startangle=90,counterclock=False,wedgeprops = {'linewidth': 0.8, 'edgecolor': 'black', 'alpha': 0.7},
             textprops={'fontsize': 6})
-    ax.set_title('%s\nn=%d' % (legendlabels[ialp],np.sum(~np.isnan(corrdata_cells[ialp,:]))))
-    # ax.text(-0.1,0.1,'n=%d' % np.sum(~np.isnan(corrdata_cells[ialp,:])),transform=ax.transAxes,ha='center',va='center',
+    ax.set_title('%s\nn=%d' % (legendlabels[ialp],np.sum(~np.isnan(dprimedata[ialp,:]))))
+    # ax.text(-0.1,0.1,'n=%d' % np.sum(~np.isnan(dprimedata[ialp,:])),transform=ax.transAxes,ha='center',va='center',
     #         fontsize=6)
-my_savefig(fig,savedir,'Corr_%s_Sign_PieCharts_%dsessions' % (direction,nSessions))
+my_savefig(fig,savedir,'Dprime_%s_Sign_PieCharts_%dsessions' % (direction,nSessions))
+
 
 #%% Fraction of significant multiplicative and additively modulated cells:
-sign = 1
-fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
+modsign = -1
+orderversion = 1
+modsign = 1
+orderversion = 0
+signlabel = 'excited' if modsign==1 else 'inhibited'
+
+if orderversion==1:
+    affinelabels = ['mult.','div.','add.','sub.']
+else:
+    affinelabels = ['mult.','add.','div.','sub.']
+
+#%% Make the figure:
+fig,axes = plt.subplots(1,1,figsize=(4.5*cm,3.8*cm))
 ax = axes
-idx_N =  rangeresp>params['minrangeresp']
 sigmat = np.empty((3,2))
 countmat = np.empty((3,2))
-for itype,(mult,add) in enumerate(zip([1,0,1],[0,1,1])):
-    for ialp,alp in enumerate(arealabelpairs):
-        Nsig = np.sum(np.all((
-                    sig_params_regress[idx_N,ialp,0]==mult,
-                    sig_params_regress[idx_N,ialp,1]==add,
-                    corrsig_cells[ialp,idx_N]==sign,
-                        ),axis=0))
-        Ntotal = np.sum(~np.isnan(sig_params_regress[idx_N,ialp,0]))
-        sigmat[itype,ialp] = Nsig
-        countmat[itype,ialp] = Ntotal
-        frac = Nsig/Ntotal
-        xpos = itype*2 + ialp
-        ax.bar(xpos,frac,width=0.8,color=clrs_arealabelpairs[ialp])
-    pval = stats.chi2_contingency([[sigmat[itype,0], countmat[itype,0]-sigmat[itype,0]],
-                            [sigmat[itype,1], countmat[itype,1]-sigmat[itype,1]]])[1]
-    add_stat_annotation(ax,xpos-1,xpos+0,frac+0.01,pval,h=0,fontsize=9)
+barwidth = 0.5
+ncomparisons = 8
+for iafftype in [0,1]: # 0 = multiplicative, 1 = additive
+    for iaffsign,affsign in enumerate([1,-1]): # 1 = positive, -1 = negative
+        fracs = np.empty((2))
+        for ialp,alp in enumerate(arealabelpairs):
+            Nsig = np.sum(np.all((
+                        dprimesig[ialp,:]==modsign,
+                        sig_params_regress[:,ialp,iafftype]==affsign,
+                        rangeresp>params['minrangeresp'],
+                            ),axis=0))
+            Ntotal = np.sum(np.all((
+                        ~np.isnan(sig_params_regress[:,ialp,iafftype]),
+                        dprimesig[ialp,:]==modsign,
+                        rangeresp>params['minrangeresp'],
+                            ),axis=0))
+            sigmat[iafftype,ialp] = Nsig
+            countmat[iafftype,ialp] = Ntotal
+            fracs[ialp] = Nsig/Ntotal
+
+            if orderversion==1: 
+                xpos = iaffsign*2 + iafftype*4 + (ialp*2-1) * barwidth/1.5
+            else: 
+                xpos = iafftype*2 + iaffsign*4 + (ialp*2-1) * barwidth/1.5
+            print(xpos)
+            ax.bar(xpos,fracs[ialp],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
+        
+
+        if np.any(fracs>0):
+            pval = stats.chi2_contingency([[sigmat[iafftype,0], countmat[iafftype,0]-sigmat[iafftype,0]],
+                                [sigmat[iafftype,1], countmat[iafftype,1]-sigmat[iafftype,1]]])[1]
+            pval = np.clip(pval*ncomparisons,0,1)
+            # print(pval)
+            if orderversion==1: 
+                xpos = iaffsign*2 + iafftype*4 + (np.array([0,1])*2-1) * barwidth/1.5
+            else: 
+                xpos = iafftype*2 + iaffsign*4 + (np.array([0,1])*2-1) * barwidth/1.5
+            add_stat_annotation(ax,xpos[0],xpos[1],np.max(fracs)+0.05,pval,h=0,fontsize=7)
+ax.text(0.4, 0.9, '%s (n=%d)' % (legendlabels[0],countmat[0,0]), fontsize=5,color=clrs_arealabelpairs[0],transform=ax.transAxes)
+ax.text(0.4, 0.8, '%s (n=%d)' % (legendlabels[1],countmat[0,1]), fontsize=5,color=clrs_arealabelpairs[1],transform=ax.transAxes)
+
 ax_nticks(ax,4)
-ax.text(0.6, 0.9, '%s (n=%d)' % (legendlabels[0],np.sum(corrsig_cells[0,idx_N]==sign)), color=clrs_arealabelpairs[0],transform=ax.transAxes)
-ax.text(0.6, 0.8, '%s (n=%d)' % (legendlabels[1],np.sum(corrsig_cells[1,idx_N]==sign)), color=clrs_arealabelpairs[1],transform=ax.transAxes)
-ax.set_xticks(np.arange(3)*2+0.5,['Mult','Add','Both'])
-ax.set_ylabel('Fraction of + correlated cells')
+ax.set_xticks(np.arange(4)*2,affinelabels)
+ax.set_ylabel('Fraction of %s neurons' % signlabel)
+ax.set_yticks(np.arange(0,1.1,0.2))
+ax.set_ylim([0,1])
 plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'%s_affinemodulation_sig_posmod_Layers_%dsessions' % (direction,nSessions))
+sns.despine(fig=fig, top=True, right=True,offset=1,trim=False)
+my_savefig(fig,savedir,'%s_Affinemodulation_Layers_%s_cells_%dsessions' % (direction,signlabel,nSessions))
 
-#%% Fraction of significant multiplicative and additively modulated cells:
-sign = -1
-fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
-ax = axes
-idx_N =  rangeresp>params['minrangeresp']
-sigmat = np.empty((3,2))
-countmat = np.empty((3,2))
-for itype,(mult,add) in enumerate(zip([-1,0,-1],[0,-1,-1])):
-    for ialp,alp in enumerate(arealabelpairs):
-        Nsig = np.sum(np.all((
-                    sig_params_regress[idx_N,ialp,0]==mult,
-                    sig_params_regress[idx_N,ialp,1]==add,
-                    corrsig_cells[ialp,idx_N]==sign,
-                        ),axis=0))
-        Ntotal = np.sum(~np.isnan(sig_params_regress[idx_N,ialp,0]))
-        sigmat[itype,ialp] = Nsig
-        countmat[itype,ialp] = Ntotal
-        frac = Nsig/Ntotal
-        xpos = itype*2 + ialp
-        ax.bar(xpos,frac,width=0.8,color=clrs_arealabelpairs[ialp])
-    pval = stats.chi2_contingency([[sigmat[itype,0], countmat[itype,0]-sigmat[itype,0]],
-                            [sigmat[itype,1], countmat[itype,1]-sigmat[itype,1]]])[1]
-    add_stat_annotation(ax,xpos-1,xpos+0,frac+0.01,pval,h=0,fontsize=9)
-    ax_nticks(ax,3)
+
+# #%% Fraction of significant multiplicative and additively modulated cells:
+# sign = 1
+# fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
+# ax = axes
+# idx_N =  rangeresp>params['minrangeresp']
+# sigmat = np.empty((3,2))
+# countmat = np.empty((3,2))
+# for itype,(mult,add) in enumerate(zip([1,0,1],[0,1,1])):
+#     for ialp,alp in enumerate(arealabelpairs):
+#         Nsig = np.sum(np.all((
+#                     sig_params_regress[idx_N,ialp,0]==mult,
+#                     sig_params_regress[idx_N,ialp,1]==add,
+#                     dprimesig[ialp,idx_N]==sign,
+#                         ),axis=0))
+#         Ntotal = np.sum(~np.isnan(sig_params_regress[idx_N,ialp,0]))
+#         sigmat[itype,ialp] = Nsig
+#         countmat[itype,ialp] = Ntotal
+#         frac = Nsig/Ntotal
+#         xpos = itype*2 + ialp
+#         ax.bar(xpos,frac,width=0.8,color=clrs_arealabelpairs[ialp])
+#     pval = stats.chi2_contingency([[sigmat[itype,0], countmat[itype,0]-sigmat[itype,0]],
+#                             [sigmat[itype,1], countmat[itype,1]-sigmat[itype,1]]])[1]
+#     add_stat_annotation(ax,xpos-1,xpos+0,frac+0.01,pval,h=0,fontsize=9)
+# ax_nticks(ax,4)
+# ax.text(0.6, 0.9, '%s (n=%d)' % (legendlabels[0],np.sum(dprimesig[0,idx_N]==sign)), color=clrs_arealabelpairs[0],transform=ax.transAxes)
+# ax.text(0.6, 0.8, '%s (n=%d)' % (legendlabels[1],np.sum(dprimesig[1,idx_N]==sign)), color=clrs_arealabelpairs[1],transform=ax.transAxes)
+# ax.set_xticks(np.arange(3)*2+0.5,['Mult','Add','Both'])
+# ax.set_ylabel('Fraction of + correlated cells')
+# plt.tight_layout()
+# sns.despine(fig=fig, top=True, right=True,offset=3)
+# my_savefig(fig,savedir,'%s_affinemodulation_sig_posmod_Layers_%dsessions' % (direction,nSessions))
+
+# #%% Fraction of significant multiplicative and additively modulated cells:
+# sign = -1
+# fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
+# ax = axes
+# idx_N =  rangeresp>params['minrangeresp']
+# sigmat = np.empty((3,2))
+# countmat = np.empty((3,2))
+# for itype,(mult,add) in enumerate(zip([-1,0,-1],[0,-1,-1])):
+#     for ialp,alp in enumerate(arealabelpairs):
+#         Nsig = np.sum(np.all((
+#                     sig_params_regress[idx_N,ialp,0]==mult,
+#                     sig_params_regress[idx_N,ialp,1]==add,
+#                     dprimesig[ialp,idx_N]==sign,
+#                         ),axis=0))
+#         Ntotal = np.sum(~np.isnan(sig_params_regress[idx_N,ialp,0]))
+#         sigmat[itype,ialp] = Nsig
+#         countmat[itype,ialp] = Ntotal
+#         frac = Nsig/Ntotal
+#         xpos = itype*2 + ialp
+#         ax.bar(xpos,frac,width=0.8,color=clrs_arealabelpairs[ialp])
+#     pval = stats.chi2_contingency([[sigmat[itype,0], countmat[itype,0]-sigmat[itype,0]],
+#                             [sigmat[itype,1], countmat[itype,1]-sigmat[itype,1]]])[1]
+#     add_stat_annotation(ax,xpos-1,xpos+0,frac+0.01,pval,h=0,fontsize=9)
+#     ax_nticks(ax,3)
     
-ax.text(0.6, 0.9, '%s (n=%d)' % (legendlabels[0],np.sum(corrsig_cells[0,idx_N]==sign)), color=clrs_arealabelpairs[0],transform=ax.transAxes)
-ax.text(0.6, 0.8, '%s (n=%d)' % (legendlabels[1],np.sum(corrsig_cells[1,idx_N]==sign)), color=clrs_arealabelpairs[1],transform=ax.transAxes)
+# ax.text(0.6, 0.9, '%s (n=%d)' % (legendlabels[0],np.sum(dprimesig[0,idx_N]==sign)), color=clrs_arealabelpairs[0],transform=ax.transAxes)
+# ax.text(0.6, 0.8, '%s (n=%d)' % (legendlabels[1],np.sum(dprimesig[1,idx_N]==sign)), color=clrs_arealabelpairs[1],transform=ax.transAxes)
 
-ax.set_xticks(np.arange(3)*2+0.5,['Div','Sub','Both'])
-ax.set_ylabel('Fraction of - correlated cells')
-plt.tight_layout()
-sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'%s_affinemodulation_sig_negmod_Layers_%dsessions' % (direction,nSessions))
+# ax.set_xticks(np.arange(3)*2+0.5,['Div','Sub','Both'])
+# ax.set_ylabel('Fraction of - correlated cells')
+# plt.tight_layout()
+# sns.despine(fig=fig, top=True, right=True,offset=3)
+# my_savefig(fig,savedir,'%s_affinemodulation_sig_negmod_Layers_%dsessions' % (direction,nSessions))
 
 # #%%
 # fracmat     = np.full((3,3,narealabelpairs+1),np.nan)
@@ -431,45 +516,6 @@ my_savefig(fig,savedir,'%s_affinemodulation_sig_negmod_Layers_%dsessions' % (dir
 #         testmat[imult,iadd] = stats.chi2_contingency(data)[1]  # p-value
 # testmat = testmat * ncomparisons  #bonferroni correction
 
-# fig,axes = plt.subplots(1,3,figsize=(9,3))
-# for ialp in range(narealabelpairs+1):
-#     ax = axes[ialp]
-#     if ialp < narealabelpairs:
-#         vmin,vmax = 0,25
-#         # cmap = 'Purples'
-#         cmap = 'viridis'
-#         # cmap = 'magma'
-#         # cmap = 'Greens'
-#     else:
-#         vmin,vmax = -5,5
-#         # cmap = 'bwr'
-#         cmap = 'PiYG'
-#     im = ax.imshow(fracmat[:,:,ialp],vmin=vmin,vmax=vmax,cmap=cmap)
-
-#     ax.set_xticks([0,1,2],['Sub','None','Add'])
-#     # ax.set_yticks([0,1,2],['Div','None','Mult'])
-#     ax.set_yticks([0,1,2],['Mult','None','Div'])
-#     ax.set_xlabel('Addition')
-#     if ialp == 0:
-#         ax.set_ylabel('Multiplicative')
-#     ax.set_title(legendlabels[ialp] if ialp < narealabelpairs else 'Diff (FB-FF)')
-#     for i in range(3):
-#         for j in range(3):
-#             if ialp != narealabelpairs:
-#                 # ax.text(j,i,'%1.2f' % fracmat[i,j,ialp],ha='center',va='center',color='white' if fracmat[i,j,ialp]<20 else 'black')
-#                 ax.text(j,i,'%2.1f%%' % fracmat[i,j,ialp],ha='center',va='center',color='white' if fracmat[i,j,ialp]<20 else 'black')
-#             else: 
-#                 # ax.text(j,i,'%s%2.1f%%\n%s' % ('+' if fracmat[i,j,ialp]>0 else '',fracmat[i,j,ialp],get_sig_asterisks(testmat[i,j])),ha='center',va='center',color='white' if fracmat[i,j,ialp]>0.2 else 'black')
-#                 ax.text(j,i,'%s%2.1f%%\n%s' % ('+' if fracmat[i,j,ialp]>0 else '',fracmat[i,j,ialp],get_sig_asterisks(testmat[i,j])),
-#                         # ha='center',va='center',color='white' if fracmat[i,j,ialp]>0.2 else 'black')
-#                         ha='center',va='center',color='black')
-#                 # ax.text(j,i,'%+2.1f%%' % ('+' if fracmat[i,j,ialp]>0 else '') + '%2.1f%%' % fracmat[i,j,ialp],ha='center',va='center',color='white' if fracmat[i,j,ialp]>0.2 else 'black')
-
-#     fig.colorbar(im,ax=ax,fraction=0.046, pad=0.04,label='% sign. cells')
-# plt.tight_layout()
-# my_savefig(fig,savedir,'Affine_sig_mod_FF_FB_heatmap_layers_%dsessions' % (nSessions))
-
-
 #%% 
 fig,axes = plt.subplots(1,2,figsize=(8*cm,4*cm),sharey=True)
 for iparam in range(2):
@@ -488,7 +534,7 @@ for iparam in range(2):
     for ialp,alp in enumerate(arealabelpairs):
         idx_N = np.all((
                 rangeresp>params['minrangeresp'],
-                corrsig_cells[ialp,:]==1,
+                dprimesig[ialp,:]==1,
                 ),axis=0)
         sns.histplot(data=params_regress[idx_N,ialp,iparam],element='step',
                      color=clrs_arealabelpairs[ialp],
@@ -504,9 +550,12 @@ for iparam in range(2):
                 rangeresp>params['minrangeresp'],
                 ),axis=0)
     
-    h,p = stats.ttest_ind(params_regress[idx_N,0,iparam],
-                            params_regress[idx_N,1,iparam],nan_policy='omit')
+    # h,p = stats.ttest_ind(params_regress[idx_N,0,iparam],
+    #                         params_regress[idx_N,1,iparam],nan_policy='omit')
+    h,p = stats.mannwhitneyu(params_regress[idx_N,0,iparam],
+                            params_regress[idx_N,1,iparam],alternative='two-sided',nan_policy='omit')
     p = np.clip(p * narealabelpairs * 2,0,1) #bonferroni + clip
+    print(p)
     # ax.text(0.6, 0.15, '%s,p=%1.2f' % (get_sig_asterisks(p,return_ns=True),p), transform=ax.transAxes,fontsize=9)
     ax.text(0.45, 0.5, '%s' % (get_sig_asterisks(p,return_ns=True)),
             transform=ax.transAxes)
@@ -518,7 +567,64 @@ for iparam in range(2):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=2)
 
-my_savefig(fig,savedir,'%s_affinemodulation_layers_posmod_cumhistcoefs_%dGRsessions' % (direction,nSessions))
+# my_savefig(fig,savedir,'%s_affinemodulation_layers_posmod_cumhistcoefs_%dGRsessions' % (direction,nSessions))
+
+#%% Cumulative
+for modsign in [-1,1]:
+    signlabel = 'excited' if modsign==1 else 'inhibited'
+
+    fig,axes = plt.subplots(1,2,figsize=(8*cm,4*cm),sharey=True)
+    for iparam in range(2):
+        ax = axes[iparam]
+        if iparam == 0:
+            ax.set_xlabel('Multiplicative Slope')
+            bins = np.arange(-0.15,5,0.015)
+            xlims = [0,3]
+            bins = np.arange(-0.2,3.5,0.015)
+            xlims = [bins[0],bins[-1]]
+            ax.axvline(1,color='grey',ls='--',linewidth=1)
+        else:
+            ax.set_xlabel('Additive Offset')
+            bins = np.arange(-0.01,0.06,0.0001)
+            xlims = [bins[0],bins[-1]]
+            ax.axvline(0,color='grey',ls='--',linewidth=1)
+        handles = []
+        for ialp,alp in enumerate(arealabelpairs):
+            idx_N = np.all((
+                    rangeresp>params['minrangeresp'],
+                    dprimesig[ialp,:]==modsign,
+
+                    # np.any(dprimesig==modsign,axis=0),
+                    ),axis=0)
+            datatoplot = np.clip(params_regress[idx_N,ialp,iparam],bins[1],bins[-2])
+            sns.histplot(data=datatoplot,element='step',
+                        color=clrs_arealabelpairs[ialp],
+                        alpha=1,linewidth=1.5,ax=ax,stat='probability',bins=bins,cumulative=True,fill=False)
+            handles.append(ax.plot(np.nanmean(datatoplot),0.95,markersize=6,
+                    color=clrs_arealabelpairs[ialp],marker='v')[0])
+            ncells = np.sum(~np.isnan(datatoplot))
+
+            ax.text(0.4, 0.1+ialp*0.1, '%s (n=%d)' % (legendlabels[ialp],ncells), 
+                    transform=ax.transAxes,fontsize=5,color=clrs_arealabelpairs[ialp])
+            
+        idx_N = np.all((
+                rangeresp>params['minrangeresp'],
+                ),axis=0)
+        h,p = stats.mannwhitneyu(params_regress[idx_N,0,iparam],
+                                params_regress[idx_N,1,iparam],nan_policy='omit')
+        p = np.clip(p * narealabelpairs * 2,0,1) #bonferroni + clip
+        ax.text(0.45, 0.5, '%s' % (get_sig_asterisks(p,return_ns=True)),
+                transform=ax.transAxes,fontsize=10)
+        ax.set_yticks([0,0.5,1.0])
+        ax.set_xlim(xlims)
+        ax.set_ylim([0,1])
+        ax.set_ylabel('Cumulative fraction of cells')
+
+    plt.tight_layout()
+    sns.despine(fig=fig, top=True, right=True,offset=2)
+
+    my_savefig(fig,savedir,'%s_Layers_affinemodulation_dprime_%s_cumhistcoefs_%dGRsessions' % (direction,signlabel,nSessions))
+
 
 #%% Is the effect similar for the two areas, but 
 # just dependent on a difference in activity levels?
@@ -578,7 +684,7 @@ ax = axes[1]
 for ialp,alp in enumerate(arealabelpairs):
     idx_N = np.all((
                 rangeresp>params['minrangeresp'],
-                # corrsig_cells[ialp,:]==1,
+                # dprimesig[ialp,:]==1,
                 sig_params_regress[:,ialp,0]==1,
                 sig_params_regress[:,ialp,1]!=1,
                 ),axis=0)
@@ -622,7 +728,7 @@ for ialp,alp in enumerate(arealabelpairs):
                 rangeresp>params['minrangeresp'],
                 sig_params_regress[:,ialp,0]!=1,
                 sig_params_regress[:,ialp,1]==1,
-                # corrsig_cells[ialp,:]==-1,
+                # dprimesig[ialp,:]==-1,
                 ),axis=0)
     xdata = np.nanmean(mean_resp_split[np.ix_([ialp],range(16),[0,1],idx_N)],axis=(0,2)).flatten()
     ydata = resp_mod[np.ix_([ialp],range(16),idx_N)].flatten()
@@ -662,174 +768,3 @@ for ibin in range(len(bincenters)):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 # my_savefig(fig,savedir,'%s_Modulation_vs_Activity_layers_%dGRsessions' % (direction,nSessions))
-
-
-
-#%% 
-
-   #    ####### ####### ### #     # #######     #####  #     #    #    ######     #     #####  
-  # #   #       #        #  ##    # #          #     # #     #   # #   #     #   # #   #     # 
- #   #  #       #        #  # #   # #          #       #     #  #   #  #     #  #   #  #       
-#     # #####   #####    #  #  #  # #####      #       ####### #     # ######  #     # #       
-####### #       #        #  #   # # #          #       #     # ####### #   #   ####### #       
-#     # #       #        #  #    ## #          #     # #     # #     # #    #  #     # #     # 
-#     # #       #       ### #     # #######     #####  #     # #     # #     # #     #  #####  
-
-#%% Show some example neurons:
-
-# #%% use 
-# ialp = 0
-# # ialp = 1
-# legendlabels        = ['FF','FB']
-
-# #%% Get good multiplicatively modulated cells:
-# #mutliplicative: 
-# idx_examples = np.all((params_regress[:,ialp,0]>np.nanpercentile(params_regress[:,ialp,0],90),
-#                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
-#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-#                         rangeresp>params['minrangeresp'],
-#                        ),axis=0)
-# # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-
-# #%% Get good divisive modulated cells:
-# idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
-#                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],50),
-#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-#                         rangeresp>params['minrangeresp'],
-#                        ),axis=0)
-
-# example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-
-# #%% Get good additively modulated cells: 
-# #additive:
-# idx_examples = np.all((
-#                         # params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
-#                        params_regress[:,ialp,1]>np.nanpercentile(params_regress[:,ialp,1],70),
-#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],75),
-#                         rangeresp>params['minrangeresp'],
-#                        ),axis=0)
-# # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-
-# idx_examples = np.all((
-#                        params_regress[:,ialp,0]>0.9,#slope within reasonable range of 1
-#                        params_regress[:,ialp,0]<1.1,   
-#                         # params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],50),
-#                        params_regress[:,ialp,1]>np.nanpercentile(params_regress[:,ialp,1],85),
-#                         # params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-#                         rangeresp>params['minrangeresp'],
-#                        ),axis=0)
-# # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-
-# #%% Get good subtractive modulated cells: 
-# idx_examples = np.all((params_regress[:,ialp,0]<np.nanpercentile(params_regress[:,ialp,0],70),
-#                        params_regress[:,ialp,1]<np.nanpercentile(params_regress[:,ialp,1],25),
-#                        params_regress[:,ialp,2]>np.nanpercentile(params_regress[:,ialp,2],80),
-#                        ),axis=0)
-# # example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-
-# #%% 
-
-# #%% Plot two example neurons, one FF and one FB, with tuning curve and scatter side by side
-# example_cells = [
-#                     'LPE11086_2024_01_10_5_0048', #FF Additive          #paper FF example 1
-#                     'LPE11086_2024_01_10_4_0096', #FF additive          #paper FF example 2
-
-#                     'LPE11086_2024_01_10_2_0046', #FB Multiplicative    #paper FB example 1
-#                     'LPE10885_2023_10_12_5_0110', #FB Multiplicative    #paper FB example 2
-#                     ]
-
-# #%% List of additional example FF cells:
-# example_cells = [
-#                     'LPE11086_2024_01_05_4_0020', #FF additive 
-#                     'LPE11086_2024_01_05_5_0030', #FF additive
-#                     'LPE11086_2024_01_05_5_0169', #FF multiplicative
-#                     # 'LPE09665_2023_03_21_7_0011', #FF divisive
-#                     # 'LPE11086_2024_01_05_6_0103', #FF additive
-#                     # 'LPE09830_2023_04_10_5_0065', #FF additive
-#                     # 'LPE11086_2024_01_05_4_0002', #FF additive
-#                     # 'LPE11086_2024_01_05_4_0235', #FF additive
-#                     # 'LPE11086_2024_01_05_4_0075', #FF additive
-#                     # 'LPE11086_2024_01_10_4_0017', #FF additive
-#                     # 'LPE11086_2024_01_10_5_0048', #FF additive
-#                     # 'LPE11086_2024_01_05_6_0304', #FF additive
-#                     # 'LPE11086_2024_01_10_4_0055', #FF additive
-#                     # 'LPE11086_2024_01_10_4_0017', #FF additive
-#                     'LPE11086_2024_01_10_4_0014', #FF additive
-#                     'LPE10885_2023_10_19_0_0037', #FF additive
-#                     'LPE11086_2024_01_05_4_0053', #FF additive
-#                     'LPE11086_2024_01_10_4_0096', #FF additive
-#                     # 'LPE11086_2024_01_05_4_0040', #FF additive
-#                     # 'LPE10919_2023_11_06_0_0322', #FF subtractive/divisive
-#                     ]
-
-# #%%
-# example_cells = [
-#                     'LPE12223_2024_06_10_1_0051', #FB multiplicative  #paper FB example 2
-#                     'LPE11086_2024_01_10_2_0046', #FB multiplicative
-#                     'LPE10885_2023_10_12_6_0014', #FB Multiplicative
-#                     'LPE10885_2023_10_12_5_0110', #FB Multiplicative
-#                     # 'LPE11086_2024_01_05_0_0030', #FB additive
-#                     # 'LPE11086_2024_01_10_3_0108', #FB multiplicative     
-#                     # 'LPE10885_2023_10_12_5_0036', #FB Multiplicative
-#                     # 'LPE10885_2023_10_12_4_0140', #FB Multiplicative
-#                     # 'LPE11086_2024_01_10_0_0009', #FB additive
-#                     # 'LPE10885_2023_10_23_1_0276', #FB divisive
-#                     # 'LPE10919_2023_11_06_5_0304', #FB divisive
-#                     # 'LPE11086_2024_01_10_0_0143', #FB additive
-#                 ]
-
-# #%% Plot in two ways:
-# example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-# for example_cell in example_cells:
-#     idx_N = np.where(celldata['cell_id']==example_cell)[0][0]
-#     ialp = np.where(~np.isnan(mean_resp_split[:,0,0,idx_N]))[0][0]
-#     ustim = np.unique(sessions[ises].trialdata['Orientation'])
-#     x = mean_resp_split[ialp,:,0,idx_N]
-#     y = mean_resp_split[ialp,:,1,idx_N]
-#     xerror = error_resp_split[ialp,:,0,idx_N]
-#     yerror = error_resp_split[ialp,:,1,idx_N]
-    
-#     # clrs_stimuli    = sns.color_palette('viridis',8)
-#     fig,axes = plt.subplots(1,2,figsize=(7*cm,3.5*cm))
-
-#     ax = axes[0]
-#     ax.scatter(ustim,x,color=clrs_arealabels_low_high[ialp,0],s=10)
-#     ax.plot(ustim,x,color=clrs_arealabels_low_high[ialp,0],linestyle='-')
-#     # ax.errorbar(ustim,x,yerr=xerror,color='k',ls='None',linewidth=1)
-#     ax.errorbar(ustim,x,yerr=xerror,color=clrs_arealabels_low_high[ialp,0],ls='None')
-
-#     ax.scatter(ustim,y,color=clrs_arealabels_low_high[ialp,1],s=10)
-#     ax.plot(ustim,y,color=clrs_arealabels_low_high[ialp,1],linestyle='-')
-#     # ax.errorbar(ustim,y,yerr=yerror,color='k',ls='None',linewidth=1)
-#     ax.errorbar(ustim,y,yerr=yerror,color=clrs_arealabels_low_high[ialp,1],ls='None')
-#     ax.set_xlabel('stimulus direction (deg)')
-#     ax.set_ylabel('response')
-#     ax_nticks(ax,4)
-#     ax.set_xticks([0,90,180,270,360])
-#     ax.tick_params(axis='both', which='major')
-
-#     ax = axes[1]
-#     ax.scatter(x,y,color='#666666',s=5)
-#     # ax.errorbar(x,y,xerr=xerror,yerr=yerror,color='k',ls='None')
-#     b = linregress(x, y)
-#     xp = np.linspace(np.percentile(x,0),np.percentile(x,100)*1.1,100)
-#     ax.plot(xp,b[0]*xp+b[1],color=clrs_arealabelpairs[ialp],linestyle='-',linewidth=1.5)
-
-#     # ax.text(0.5,0.05,'Slope: %1.2f\nOffest: %1.2f'%(b[0],my_ceil(b[1],precision=2)),
-#     ax.text(0.5,0.05,'Slope: %1.2f\nOffest: %1.2f'%(b[0],round(b[1],2)),
-#                     transform=ax.transAxes,color='k',fontsize=6)
-#     ax.tick_params(axis='both', which='major')
-
-#     ax.plot([0,1],[0,1],color='grey',ls='--')
-#     ax.set_xlim([np.nanmin([x,y]),np.nanmax([x,y])*1.1])
-#     ax.set_ylim([np.nanmin([x,y]),np.nanmax([x,y])*1.1])
-#     ax.set_ylabel('%s high' % legendlabels[ialp],color=clrs_arealabels_low_high[ialp,1])
-#     ax.set_xlabel('%s low' % legendlabels[ialp],color=clrs_arealabels_low_high[ialp,0])
-#     # ax.set_title('Example cell: %s' % example_cell,fontsize=5)
-#     # ax.set_ylabel('High',labelpad=0)
-#     # ax.set_xlabel('Low',labelpad=0)
-#     ax_nticks(ax,3)
-#     plt.tight_layout()
-#     sns.despine(fig=fig, top=True, right=True, offset=2,trim=False)
-#     # my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly'),'FF_FB_affinemodulation_Example_cell_%s' % example_cell)
-#     # my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly','BaselineCorrected'),'FF_FB_affinemodulation_Example_cell_%s' % example_cell, formats = ['png'])

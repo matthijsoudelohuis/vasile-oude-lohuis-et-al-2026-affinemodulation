@@ -818,10 +818,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
             dprimesig[ialp,idx_ses] = bootdprime_sig[idx_N3]
         
-        # fig,ax = plt.subplots()
-        # ax.hist(bootdprimedata[0,:])
-        # ax.axvline(dprime_ses[0],color='r')
-
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
