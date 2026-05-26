@@ -53,14 +53,6 @@ for ises in range(nSessions):
 sessiondata             = pd.concat([ses.sessiondata for ses in sessions]).reset_index(drop=True)
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
 
-def compute_dprime(X,Y):
-    #x and y are vectors of shape (nsamples)
-    return (np.nanmean(X) - np.nanmean(Y)) / np.sqrt((np.nanstd(X)**2 + np.nanstd(Y)**2)/2)
-
-def compute_dprime_mat(X,Y):
-    #X and Y are matrices of shape (nfeatures,nsamples)
-    return (np.nanmean(X,axis=1) - np.nanmean(Y,axis=1)) / np.sqrt((np.nanstd(X,axis=1)**2 + np.nanstd(Y,axis=1)**2)/2)
-
 #%% Show tuning curve when activity in the other area is low or high (only still trials)
 arealabelpairs  = [
                     'V1lab-V1unl-PMunlL2/3',
@@ -111,15 +103,10 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         ori_ses             = sessions[ises].trialdata['Orientation']
         oris                = np.unique(ori_ses)
         for i,ori in enumerate(oris):
-            # idx_T               = ori_ses == ori
             idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
 
             idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])
             idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])
-            # meanresp[:,i,0]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1)
-            # meanresp[:,i,1]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1)
-            # errorresp[:,i,0]    = np.nanstd(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1) / np.sqrt(np.sum(np.logical_and(idx_T,idx_K1)))
-            # errorresp[:,i,1]    = np.nanstd(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1) / np.sqrt(np.sum(np.logical_and(idx_T,idx_K2)))
 
             meanresp[:,i,0,:]     = np.nanmean(tensordata[:,np.logical_and(idx_T,idx_K1),:],axis=1)
             meanresp[:,i,1,:]     = np.nanmean(tensordata[:,np.logical_and(idx_T,idx_K2),:],axis=1)
@@ -145,42 +132,41 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 #%% Show some example neurons:
 legendlabels        = ['FF','FB']
 
-#%% Plot positively modulated example neurons:
+#%% Plot modulated example neurons:
 example_cells = [
-                    'LPE11086_2024_01_05_5_0018', #FF           #paper FF example 1
-                    'LPE11086_2024_01_05_6_0273', #FF           #paper FF example 2
+                    'LPE11086_2024_01_05_6_0273', #FF       pos    
+                    'LPE10919_2023_11_06_2_0068', #FF       neg
 
-                    'LPE12223_2024_06_10_1_0171', #FB     #paper FB example 1
-                    'LPE11086_2024_01_05_0_0062', #FB     #paper FB example 2
-                      'LPE11086_2024_01_05_1_0121', #FB
+                    'LPE12223_2024_06_10_1_0171', #FB       pos
+                    'LPE10919_2023_11_06_4_0120', #FB       neg
                     ]
 
-#%% Plot negatively modulated example neurons:
+#%% Additional example cells:   
 example_cells = [
-                    'LPE10919_2023_11_06_2_0103', #FF           #paper FF example 1
-                    'LPE10919_2023_11_06_0_0140', #FF           #paper FF example 2
-                    'LPE10919_2023_11_06_2_0068', #FF           #paper FF example 2
+                    'LPE10919_2023_11_06_2_0103', #FF         
+                    'LPE10919_2023_11_06_0_0140', #FF         
+                    'LPE10919_2023_11_06_0_0051', #FF        
 
-                    'LPE11086_2024_01_05_1_0061', #FB     #paper FB example 1
-                    'LPE10919_2023_11_06_4_0016', #FB     #paper FB example 2
-                    #   'LPE11086_2024_01_05_1_0121', #FB
+                    'LPE11086_2024_01_05_1_0061', #FB  
+                    'LPE10919_2023_11_06_4_0016', #FB    
+                    'LPE11086_2024_01_05_0_0062', #FB     
+                    'LPE11086_2024_01_05_1_0121', #FB
                     ]
 
-#%%
+#%% Or look for strongly positively modulated neurons:
 ialp = 1
 idx_examples = np.all((dprimedata[ialp,:]>np.nanpercentile(dprimedata[ialp,:],90),
                        ),axis=0)
+example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 
-#%%
+#%% Or look for strongly negatively modulated neurons:
 ialp = 1
 idx_examples = np.all((dprimedata[ialp,:]<np.nanpercentile(dprimedata[ialp,:],10),
                        ),axis=0)
+example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
 
 #%% Plot the activity over time for example cells:
-# example_cells      = [np.random.choice(celldata['cell_id'][idx_examples])]
-# istim = 7
-# istim = 11
-# xanchor = -0.9
+
 xanchor = 2.4
 yanchor = 0
 clrs_low_high = ['blue','red']
@@ -188,6 +174,7 @@ print(example_cells)
 for example_cell in example_cells:
     idx_N = np.where(celldata['cell_id']==example_cell)[0][0]
     ialp = np.where(~np.isnan(mean_resp_split[:,0,0,idx_N]))[0][0]
+    print('Example cell %s, dprime: %1.2f (%s)' % (example_cell,dprimedata[ialp,idx_N],legendlabels[ialp]))
     istim = np.abs(np.diff(np.nanmean(mean_resp_split[ialp,:,:,idx_N,:],axis=-1),axis=1)).argmax()
     ustim = np.unique(sessions[ises].trialdata['Orientation'])
     ymean = mean_resp_split[ialp,istim,:,idx_N,:]
@@ -206,18 +193,14 @@ for example_cell in example_cells:
     ax.text(0.2,0.9,r'd`:%s%1.2f' % ('+' if dprime>0 else '',dprime),transform=ax.transAxes)
     ax.plot([0,0.75],[0,0],color='black',ls='-',linewidth=2,solid_capstyle='butt')
     ax.set_xlim([t_axis[0],np.max([t_axis[-1],xanchor+0.1])])
-    ax.set_ylim([-0.1,1.1])
+    ax.set_ylim([-0.1,np.nanmax(ymean+yerror)*1.2])
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Activity (dc/dF0)')
 
-    # ax.add_artist(AnchoredSizeBar(ax.transData, 1,
-    #               "1 Sec", loc=4, size_vertical=0.03,frameon=False))
-    # ax.text(xanchor,yanchor,'1 Sec',transform=ax.transAxes,fontsize=5,ha='left')
-    # ax.plot([xanchor,xanchor+1],[yanchor,yanchor],color='black',ls='-',linewidth=2,solid_capstyle='round')
     ax.plot([xanchor,xanchor],[yanchor,yanchor+0.5],color='black',ls='-',linewidth=2,solid_capstyle='butt')
     
     ax.set_axis_off()
     ax_nticks(ax,4)
-    plt.tight_layout()
+    # plt.tight_layout()
     sns.despine(fig=fig, top=True, right=True, offset=2,trim=False)
     # my_savefig(fig,os.path.join(savedir,'ExampleNeurons','StillOnly'),'Tensor_modulation_Example_cell_%s' % example_cell)

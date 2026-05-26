@@ -25,8 +25,6 @@ savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF
 params  = load_params()
 set_plot_basic_config()
 cm      = 1/2.54  # centimeters in inches
-# params['minrangeresp'] = 0.05
-# params['alpha_crossrate'] = 0.0001
 
 #%% #############################################################################
 session_list            = np.array([['LPE10919_2023_11_06']])
@@ -123,13 +121,6 @@ arealabelpairs  = [
                     'PMlab-PMunl-V1labL2/3',
                     ]
 
-# arealabelpairs  = [
-#                     'V1lab-V1unl-PMunlL5',
-#                     'V1lab-V1unl-PMlabL5',
-#                     'PMlab-PMunl-V1unlL5',
-#                     'PMlab-PMunl-V1labL5',
-#                     ]
-
 narealabelpairs         = len(arealabelpairs)
 
 celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
@@ -149,15 +140,15 @@ params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
 #Correlation output:
-corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
-corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
-pvals = np.full((narealabelpairs,nSessions),np.nan)
+# corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
+# corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
+# pvals = np.full((narealabelpairs,nSessions),np.nan)
 
-ndprimeboots            = 1000
+ndprimeboots            = 250
 # ndprimeboots = 0
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig               = np.full((narealabelpairs,nCells),np.nan)
-# params['dprime_alpha'] = 0.01
+
 np.random.seed(0)
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
@@ -246,7 +237,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         #Aligned:
         prefori                     = np.argmax(np.mean(meanresp,axis=2),axis=1)
-        # prefori                     = np.argmax(meanresp[:,:,0],axis=1)
 
         meanresp_pref          = meanresp.copy()
         for n in range(N):
@@ -260,12 +250,12 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
-        tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
-        tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
+        # tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
+        # tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
 
-        corrdata_cells[ialp,idx_ses] = tempcorr
-        tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
-        corrsig_cells[ialp,idx_ses] = tempsig
+        # corrdata_cells[ialp,idx_ses] = tempcorr
+        # tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
+        # corrsig_cells[ialp,idx_ses] = tempsig
 
         #dprime metric:
         idx_K1 = np.array([],dtype=int)
@@ -452,10 +442,13 @@ for modsign in [-1,1]:
 #     # #     # #     #    #       #    #  #     # #     #  #  #     # #     # 
 ######  ####### #######    #       #     # #     # ######  ###  #####   #####  
 
-#%%
-# from utils.tuning import comp_grating_responsive
-# sessions = comp_grating_responsive(sessions,pthr = 0.001)
-# celldata = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
+#     # ####### ######  #     # #          #    ####### ####### ######  
+##   ## #     # #     # #     # #         # #      #    #       #     # 
+# # # # #     # #     # #     # #        #   #     #    #       #     # 
+#  #  # #     # #     # #     # #       #     #    #    #####   #     # 
+#     # #     # #     # #     # #       #######    #    #       #     # 
+#     # #     # #     # #     # #       #     #    #    #       #     # 
+#     # ####### ######   #####  ####### #     #    #    ####### ######  
 
 #%% Bootstrapped comparison of correlations and significant correlations with other area: 
 # The distribution of correlations is compared to the loop correlation distribution.
@@ -545,16 +538,15 @@ bootmean        = np.full((2,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 bootmean_abs    = np.full((2,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 
 binedges        = np.linspace(-1,1,25)
-# binedges        = np.linspace(0,1,50)
 nhistbins       = len(binedges)-1
 loophist        = np.full((2,nhistbins,nradii),np.nan) # FF vs FB, +corr vs -corr
 boothist        = np.full((2,nhistbins,nradii,nboots),np.nan) # FF vs FB, +corr vs -corr
 
+# loopaffine      = np.full((2,2,nradii),np.nan) # FF vs FB, additive vs multiplicative
+# bootaffine      = np.full((2,2,nradii,nboots),np.nan) # FF vs FB, additive vs multiplicative
+
 nhasnearby      = np.full((2,nradii),np.nan) #number of labeled cells that have at least min_nearby unlabeled cells within radius
 min_nearby      = 2
-
-# sigdata = corrsig_cells
-# moddata = corrdata_cells
 
 sigdata = dprimesig
 moddata = dprimedata
@@ -578,8 +570,11 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
     loopmean[iapl,irad] = np.nanmean(moddata[1,idx_PMlab_haswithinradius])
     loopmean_abs[iapl,irad] = np.nanmean(np.abs(moddata[1,idx_PMlab_haswithinradius]))
 
-    histcounts      = np.histogram(moddata[1,idx_PMlab_haswithinradius],bins=binedges)[0]
+    histcounts              = np.histogram(moddata[1,idx_PMlab_haswithinradius],bins=binedges)[0]
     loophist[iapl,:,irad]   = np.cumsum(histcounts)/np.sum(histcounts)
+
+    # loopaffine[iapl,0,irad] = np.nanmean(params_regress[idx_PMlab_haswithinradius,ialp,0]) #multiplicative slope
+    # loopaffine[iapl,1,irad] = np.nanmean(params_regress[idx_PMlab_haswithinradius,ialp,1]) #additive offset
 
     for iboot in range(nboots):
         idx_boot = np.full(len(idx_PMlab),np.nan)
@@ -597,6 +592,9 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
 
         histcounts = np.histogram(moddata[0,idx_boot],bins=binedges)[0]
         boothist[iapl,:,irad,iboot] = np.cumsum(histcounts)/np.sum(histcounts)
+
+        # bootaffine[iapl,0,irad,iboot] = np.nanmean(params_regress[idx_boot,ialp,0]) #multiplicative slope
+        # bootaffine[iapl,1,irad,iboot] = np.nanmean(params_regress[idx_boot,ialp,1]) #additive offset
 
     #Now for V1lab:
     iapl = 1
@@ -619,6 +617,9 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
     histcounts      = np.histogram(moddata[3,idx_V1lab_haswithinradius],bins=binedges)[0]
     loophist[iapl,:,irad]   = np.cumsum(histcounts)/np.sum(histcounts)
 
+    # loopaffine[iapl,0,irad] = np.nanmean(params_regress[idx_V1lab_haswithinradius,ialp,0]) #multiplicative slope
+    # loopaffine[iapl,1,irad] = np.nanmean(params_regress[idx_V1lab_haswithinradius,ialp,1]) #additive offset
+
     for iboot in range(nboots):
         idx_boot = np.full(len(idx_V1lab),np.nan)
         for iN,N in enumerate(idx_V1lab):
@@ -634,6 +635,9 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
         bootmean_abs[iapl,irad,iboot] = np.nanmean(np.abs(moddata[2,idx_boot]))
         histcounts = np.histogram(moddata[2,idx_boot],bins=binedges)[0]
         boothist[iapl,:,irad,iboot] = np.cumsum(histcounts)/np.sum(histcounts)
+
+        # bootaffine[iapl,0,irad,iboot] = np.nanmean(params_regress[idx_boot,ialp,0]) #multiplicative slope
+        # bootaffine[iapl,1,irad,iboot] = np.nanmean(params_regress[idx_boot,ialp,1]) #additive offset
 
 #%% Plotting bootstrapped results across different radii:
 
@@ -729,6 +733,8 @@ for ialp in range(2):
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'Looped_Dprime_Modulations_Bootstrap_Radius%d' % (radius))
+
+
 
 #%% Evaluating potential confound of anatomical proximity:
 # To evaluate potential confounds due to anatomical inhomogeneities in modulations, we first measured the absolute difference in 
@@ -865,7 +871,7 @@ iplane = 4
 fig = plot_loop_plane(sessions[ises].celldata,iplane=iplane,filter_rangeresp=True,id_looped=True,radiuslooped=True,
                      cellfield='dprime',radius=50) 
 filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
-fig.savefig(os.path.join(savedir,'ExamplePlanes',filename),format = 'pdf',dpi=600,bbox_inches='tight')
+# fig.savefig(os.path.join(savedir,'ExamplePlanes',filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
 #%%
 ises = 5
@@ -873,8 +879,337 @@ iplane = 1
 fig = plot_loop_plane(sessions[ises].celldata,iplane=iplane,filter_rangeresp=True,id_looped=True,radiuslooped=True,
                      cellfield='dprime',radius=50) 
 filename = 'Example_plane_dprime_session%d_plane%d.pdf' % (ises,iplane)
-fig.savefig(os.path.join(savedir,'ExamplePlanes',filename),format = 'pdf',dpi=600,bbox_inches='tight')
+# fig.savefig(os.path.join(savedir,'ExamplePlanes',filename),format = 'pdf',dpi=600,bbox_inches='tight')
 
+#%% 
+######  ####### ####### #######    ######     #    ######  ### #     #  #####  
+#     # #     # #     #    #       #     #   # #   #     #  #  #     # #     # 
+#     # #     # #     #    #       #     #  #   #  #     #  #  #     # #       
+######  #     # #     #    #       ######  #     # #     #  #  #     #  #####  
+#     # #     # #     #    #       #   #   ####### #     #  #  #     #       # 
+#     # #     # #     #    #       #    #  #     # #     #  #  #     # #     # 
+######  ####### #######    #       #     # #     # ######  ###  #####   #####  
+   #    ####### ####### ### #     # #######                                    
+  # #   #       #        #  ##    # #                                          
+ #   #  #       #        #  # #   # #                                          
+#     # #####   #####    #  #  #  # #####                                      
+####### #       #        #  #   # # #                                          
+#     # #       #        #  #    ## #                                          
+#     # #       #       ### #     # #######                                    
+
+#%% Bootstrapped comparison of correlations and significant correlations with other area: 
+# The distribution of correlations is compared to the loop correlation distribution.
+# The fraction of significantly positive and negative as well. 
+radii           = np.arange(40,100+10,10)
+nradii          = len(radii)
+
+idx_all = np.all((
+                # celldata['noise_level']<params['maxnoiselevel'],
+                rangeresp>=params['minrangeresp'],
+                np.any(dprimesig==1,axis=0),
+                ),axis=0)
+
+idx_PMlab       = np.where(np.all((
+                                    celldata['arealayerlabel'] == 'PMlabL2/3',
+                                    idx_all
+                                    ),axis=0))[0]
+idx_V1lab       = np.where(np.all((
+                                    celldata['arealayerlabel'] == 'V1labL2/3',
+                                    idx_all
+                                    ),axis=0))[0]
+
+nPMlab          = len(idx_PMlab)
+nV1lab          = len(idx_V1lab)
+idx_PMlab_allnear  = np.full((nPMlab,2,1000),np.nan) #store all unlabeled cell indices within radius
+idx_V1lab_allnear  = np.full((nV1lab,2,1000),np.nan)
+distancemetric  = 'xyz' #or 'xy'
+
+for iN,N in tqdm(enumerate(idx_PMlab),total=nPMlab,desc='Finding PM neurons nearby labeled cells'):
+    #get index of which session this labeled cell comes from:
+    ises        = np.where(np.isin(sessiondata['session_id'],celldata['session_id'][N]))[0][0] 
+    if distancemetric == 'xyz': 
+        distmat = sessions[ises].distmat_xyz
+    elif distancemetric == 'xy':
+        distmat = sessions[ises].distmat_xy
+    #get index of all cells in this session
+    idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
+    #get index of labeled cell in this session
+    idx_N_ses   = np.where(np.isin(sessions[ises].celldata['cell_id'],celldata['cell_id'][N]))[0]
+    #get index of all unlabeled cells in this session that are nearby this particular labeled cell
+    idx_nearby_ses = np.where(np.all((
+                                        np.squeeze(distmat[idx_N_ses,:]<np.max(radii)),
+                                        sessions[ises].celldata['arealayerlabel'] == 'PMunlL2/3',
+                                        idx_all[idx_ses]
+                                        # rangeresp[idx_ses]>=params['minrangeresp'],
+                                        # sessions[ises].celldata['noise_level']<params['maxnoiselevel'],
+                                        # np.any(dprimesig[:,idx_ses]==1,axis=0)
+                                        ),axis=0))[0]
+    
+    # idx_nearby_ses = idx_nearby_ses[:200] #take first 200 closest nearby cells (is all of them actually)
+    idx_nearby_all = np.where(np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_nearby_ses]))[0]
+    idx_PMlab_allnear[iN,0,:len(idx_nearby_ses)] = idx_nearby_all
+    idx_PMlab_allnear[iN,1,:len(idx_nearby_ses)] = distmat[np.ix_(idx_N_ses,idx_nearby_ses)]
+
+for iN,N in tqdm(enumerate(idx_V1lab),total=nV1lab,desc='Finding V1 neurons nearby labeled cells'):
+    #get index of which session this labeled cell comes from:
+    ises        = np.where(np.isin(sessiondata['session_id'],celldata['session_id'][N]))[0][0] 
+    if distancemetric == 'xyz': 
+        distmat = sessions[ises].distmat_xyz
+    elif distancemetric == 'xy':
+        distmat = sessions[ises].distmat_xy
+    #get index of all cells in this session
+    idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)
+    #get index of labeled cell in this session
+    idx_N_ses   = np.where(np.isin(sessions[ises].celldata['cell_id'],celldata['cell_id'][N]))[0]
+    #get index of all unlabeled cells in this session that are nearby this particular labeled cell
+    idx_nearby_ses = np.where(np.all((
+                                        np.squeeze(distmat[idx_N_ses,:]<np.max(radii)),
+                                        sessions[ises].celldata['arealayerlabel'] == 'V1unlL2/3',
+                                        idx_all[idx_ses]
+                                        # rangeresp[idx_ses]>=params['minrangeresp'],
+                                        # sessions[ises].celldata['noise_level']<params['maxnoiselevel'],
+                                        # np.any(dprimesig[:,idx_ses]==1,axis=0)
+                                        ),axis=0))[0]
+    # idx_nearby_ses = idx_nearby_ses[:200] #limit to first 100 nearby cells
+    idx_nearby_all = np.where(np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_nearby_ses]))[0]
+    idx_V1lab_allnear[iN,0,:len(idx_nearby_ses)] = idx_nearby_all
+    idx_V1lab_allnear[iN,1,:len(idx_nearby_ses)] = distmat[np.ix_(idx_N_ses,idx_nearby_ses)]
+
+#%% 
+nboots          = 50
+nboots          = 1000
+np.random.seed(0)
+
+loopaffine      = np.full((2,2,nradii),np.nan) # FF vs FB, additive vs multiplicative
+bootaffine      = np.full((2,2,nradii,nboots),np.nan) # FF vs FB, additive vs multiplicative
+
+nhasnearby      = np.full((2,nradii),np.nan) #number of labeled cells that have at least min_nearby unlabeled cells within radius
+min_nearby      = 2
+
+for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for different radii')):
+    #For PMlab:
+    hasnearby = np.full(len(idx_PMlab),False)
+    iapl = 0
+    for iN,N in enumerate(idx_PMlab):
+        idx_within_radius = idx_PMlab_allnear[iN,0,idx_PMlab_allnear[iN,1,:] <= radius]
+        if len(idx_within_radius) >= min_nearby:
+            hasnearby[iN] = True
+    idx_PMlab_haswithinradius   = idx_PMlab[hasnearby].astype(int)
+    # print('PMlab: %d/%d' % (np.sum(hasnearby),len(hasnearby)))
+    nhasnearby[iapl,irad] = np.sum(hasnearby)
+    # print('Radius %d: %d PM looped cells with at least %d nearby cells' % (radius,np.sum(hasnearby),min_nearby))
+    
+    loopaffine[iapl,0,irad] = np.nanmean(params_regress[idx_PMlab_haswithinradius,:,0]) #multiplicative slope
+    loopaffine[iapl,1,irad] = np.nanmean(params_regress[idx_PMlab_haswithinradius,:,1]) #additive offset
+
+    for iboot in range(nboots):
+        idx_boot = np.full(len(idx_PMlab),np.nan)
+        for iN,N in enumerate(idx_PMlab):
+            idx_within_radius = idx_PMlab_allnear[iN,0,idx_PMlab_allnear[iN,1,:] <= radius]
+            if hasnearby[iN]:
+                idx_boot[iN] = np.random.choice(idx_within_radius,1)
+        idx_boot                    = idx_boot[hasnearby].astype(int)
+
+        bootaffine[iapl,0,irad,iboot] = np.nanmean(params_regress[idx_boot,:,0]) #multiplicative slope
+        bootaffine[iapl,1,irad,iboot] = np.nanmean(params_regress[idx_boot,:,1]) #additive offset
+
+    #Now for V1lab:
+    iapl = 1
+    hasnearby = np.full(len(idx_V1lab),False)
+
+    for iN,N in enumerate(idx_V1lab):
+        idx_within_radius = idx_V1lab_allnear[iN,0,idx_V1lab_allnear[iN,1,:] <= radius]
+        if len(idx_within_radius) >= min_nearby:
+            hasnearby[iN] = True
+    idx_V1lab_haswithinradius   = idx_V1lab[hasnearby].astype(int)
+    # print('V1lab: %d/%d' % (np.sum(hasnearby),len(hasnearby)))
+    nhasnearby[iapl,irad] = np.sum(hasnearby)
+
+    # print('Radius %d: %d V1 looped cells with at least %d nearby cells' % (radius,np.sum(hasnearby),min_nearby))
+
+    loopaffine[iapl,0,irad] = np.nanmean(params_regress[idx_V1lab_haswithinradius,:,0]) #multiplicative slope
+    loopaffine[iapl,1,irad] = np.nanmean(params_regress[idx_V1lab_haswithinradius,:,1]) #additive offset
+
+    for iboot in range(nboots):
+        idx_boot = np.full(len(idx_V1lab),np.nan)
+        for iN,N in enumerate(idx_V1lab):
+            idx_within_radius = idx_V1lab_allnear[iN,0,idx_V1lab_allnear[iN,1,:] <= radius]
+            if hasnearby[iN]:
+                idx_boot[iN] = np.random.choice(idx_within_radius,1)
+        idx_boot                    = idx_boot[hasnearby].astype(int)
+
+        bootaffine[iapl,0,irad,iboot] = np.nanmean(params_regress[idx_boot,:,0]) #multiplicative slope
+        bootaffine[iapl,1,irad,iboot] = np.nanmean(params_regress[idx_boot,:,1]) #additive offset
+
+#%% Plotting bootstrapped results across different radii:
+legendlabels        = ['FF','FB']
+axisbuffer          = 0.005
+lw                  = 2
+
+# subplotlabels       = np.array(['Mean','Abs. Mean','Frac. Pos.','Frac. Neg.','Frac. Mod.'])
+subplotlabels       = np.array(['Slope','Offset'])
+loopdata_subplots   = np.stack((loopaffine[:,0],loopaffine[:,1]),axis=2)
+bootdata_subplots   = np.stack((bootaffine[:,0],bootaffine[:,1]),axis=2)
+nmetrics            = len(subplotlabels)
+params['ci']        = 95
+fig,axes = plt.subplots(2,nmetrics,figsize=(nmetrics*3.3*cm,6*cm),sharey='col')
+clrs_arealabelpairs = [ '#9933FF','#00CC99']
+
+for ialp in range(2):
+    for imetric in range(nmetrics):
+        axidx = imetric
+        ax  = axes[ialp,axidx]
+        # ax.plot(radii,loopdata_subplots[ialp,:,imetric],color=clrs_arealabelpairs[ialp],linewidth=lw,marker='.',markersize=8)
+        ax.plot(radii,loopdata_subplots[ialp,:,imetric],color='r',linewidth=lw,marker='.',markersize=8)
+        tempdata = bootdata_subplots[np.ix_([ialp],range(nradii),[imetric],range(nboots))].squeeze()
+        
+        ax.fill_between(radii, np.percentile(tempdata,(100-params['ci'])/2,axis=1), np.percentile(tempdata,params['ci']+(100-params['ci'])/2,axis=1), color='grey',alpha=0.25)
+        ax_nticks(ax,3)
+        for irad,radius in enumerate(radii):
+            pval = np.sum(loopdata_subplots[ialp,irad,imetric] > bootdata_subplots[ialp,irad,imetric,:]) / nboots
+            pval = np.min([pval,1-pval])
+            pval *= nradii
+             
+            # ax.text((irad+1)/len(radii),loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
+            ax.text(radius,loopdata_subplots[ialp,irad,imetric]-axisbuffer,get_sig_asterisks(pval),
+                    fontsize=7,ha='center',va='top',color='k',rotation=45)
+        axes[ialp,axidx].set_title(legendlabels[ialp] + ' ' + subplotlabels[imetric])
+        # if imetric == 0:
+            # axes[ialp,axidx].axhline(1,color='grey',linewidth=1,linestyle='--')
+plt.tight_layout()
+sns.despine(fig=fig, top=True, right=True,offset=3)
+my_savefig(fig,savedir,'Looped_Affine_Bootstrap_Radii_dprime')
+
+
+#%% 
+######  ####### ####### #######    ######     #    ######  ### #     #  #####  
+#     # #     # #     #    #       #     #   # #   #     #  #  #     # #     # 
+#     # #     # #     #    #       #     #  #   #  #     #  #  #     # #       
+######  #     # #     #    #       ######  #     # #     #  #  #     #  #####  
+#     # #     # #     #    #       #   #   ####### #     #  #  #     #       # 
+#     # #     # #     #    #       #    #  #     # #     #  #  #     # #     # 
+######  ####### #######    #       #     # #     # ######  ###  #####   #####  
+
+#     # ### #     #    ######  ###  #####  ####### 
+##   ##  #  ##    #    #     #  #  #     #    #    
+# # # #  #  # #   #    #     #  #  #          #    
+#  #  #  #  #  #  #    #     #  #   #####     #    
+#     #  #  #   # #    #     #  #        #    #    
+#     #  #  #    ##    #     #  #  #     #    #    
+#     # ### #     #    ######  ###  #####     #    
+
+#%% Bootstrapped comparison of significantly modulated neurons as function of the distance to a looped cell. 
+radii           = np.arange(20,200+10,10)
+nradii          = len(radii)
+
+
+distancemetric = 'xyz' #or 'xy'
+
+idx_rad = np.full((2, N, nradii-1), np.nan)
+
+for ises in tqdm(range(nSessions),desc='Finding PM neurons nearby labeled cells'):
+    #get index of which session this labeled cell comes from:
+    # ises        = np.where(np.isin(sessiondata['session_id'],celldata['session_id'][N]))[0][0] 
+    if distancemetric == 'xyz': 
+        distmat = sessions[ises].distmat_xyz
+    elif distancemetric == 'xy':
+        distmat = sessions[ises].distmat_xy
+
+    mindist = np.nanmin(distmat[sessions[ises].celldata['redcell']==1,:],axis=0)
+    #get index of all cells in this session
+    idx_ses     = np.isin(celldata['session_id'],sessions[ises].session_id)    
+    # idx_ses     = np.where(idx_ses)[0]
+    # sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=radius)
+    for irad, (minrad, maxrad) in enumerate(zip(radii[:-1], radii[1:])):
+        # print(irad)
+
+        idx_N = np.all((mindist <= maxrad,
+                        mindist > minrad,
+                        sessions[ises].celldata['arealayerlabel'] == 'PMunlL2/3',
+                        ), axis=0)
+        # print(np.sum(idx_N))
+        
+        idx_rad[0, idx_ses, irad] = idx_N
+
+        idx_N = np.all((mindist <= maxrad,
+                        mindist > minrad,
+                        sessions[ises].celldata['arealayerlabel'] == 'V1unlL2/3',
+                        ), axis=0)
+        print(np.sum(idx_N))
+        idx_rad[1, idx_ses, irad] = idx_N
+
+#%%
+def my_shuffle(data,method='random',axis=0):
+    data = copy.deepcopy(data)
+    if method == 'random':
+        if axis == 0:
+            for icol in range(data.shape[1]):
+                data[:,icol] = np.random.permutation(data[:,icol])
+        elif axis == 1:
+            for irow in range(data.shape[0]):
+                data[irow,:] = np.random.permutation(data[irow,:])
+        elif axis is None:
+            rng = np.random.default_rng()
+            orig_size = data.shape
+            data = np.random.permutation(data.ravel()).reshape(orig_size)
+
+    elif method == 'circular':
+        if axis == 0:
+            for icol in range(data.shape[1]):
+                data[:,icol] = np.roll(data[:,icol],shift=np.random.randint(0,data.shape[0]))
+        elif axis == 1:
+            for irow in range(data.shape[0]):
+                data[irow,:] = np.roll(data[irow,:],shift=np.random.randint(0,data.shape[1])) 
+    else:
+        raise ValueError('method should be "random" or "circular"')
+    return data
+
+#%% Bootstratpped fraction of significantly modulated neurons as a function of minimum distance to looped cell:
+nboot           = 100
+frac_mod        = np.zeros((2,nradii-1))
+frac_mod_boot   = np.zeros((2,nradii-1,nboot))
+
+# for irad in tqdm(range(nradii-1),desc='Bootstrapping for different radii'):
+for irad in range(nradii-1):
+
+    summod = np.sum(dprimesig[0,np.where(idx_rad[0, :, irad])[0]] !=0)
+    frac_mod[0, irad] = summod / np.sum(idx_rad[0, :, irad])
+    summod = np.sum(dprimesig[2,np.where(idx_rad[1, :, irad])[0]] !=0)
+    frac_mod[1, irad] = summod / np.sum(idx_rad[1, :, irad])
+                                                
+for iboot in tqdm(range(nboot),desc='Bootstrapping'):
+    idx_rad_shuf = my_shuffle(idx_rad[0],axis=1)
+
+    # idx_rad_shuf = idx_rad[0][:,np.random.permutation(idx_rad[0].shape[1])]
+
+    for irad in range(nradii-1):
+        summod = np.sum(dprimesig[0,np.where(idx_rad_shuf[:, irad])[0]] !=0)
+        frac_mod_boot[0, irad, iboot] = summod / np.sum(idx_rad_shuf[:, irad])
+
+    idx_rad_shuf = my_shuffle(idx_rad[1],axis=1)
+    # idx_rad_shuf = idx_rad[1][:,np.random.permutation(idx_rad[1].shape[1])]
+
+    for irad in range(nradii-1):
+        summod = np.sum(dprimesig[2,np.where(idx_rad_shuf[:, irad])[0]] !=0)
+        frac_mod_boot[1, irad, iboot] = summod / np.sum(idx_rad_shuf[:, irad])
+
+#%% Plot the bootstrapped fraction of modulated neurons as a function of distance to looped cell:
+fig,ax = plt.subplots(1,2,figsize=(8*cm,4*cm),sharex=True,sharey=False)
+for ialp,alp in enumerate(legendlabels):
+    ax[ialp].plot(radii[:-1],frac_mod[ialp,:],color=clrs_arealabelpairs[ialp],linewidth=1,
+                  marker='.',markersize=4)
+    tempdata = frac_mod_boot[np.ix_([ialp],range(nradii-1),range(nboot))].squeeze()
+    ax[ialp].fill_between(radii[:-1], np.percentile(tempdata,(100-95)/2,axis=1), np.percentile(tempdata,95+(100-95)/2,axis=1),
+                          color='grey',alpha=0.25,edgecolor=None)
+    ax[ialp].set_xticks(np.arange(0,radii[-1]+10,25))
+    ax[ialp].set_xlabel('Minimum distance to looped cell (um)')
+    if ialp == 0: 
+        ax[ialp].set_ylabel('Fraction modulated')
+    ax[ialp].set_title(legendlabels[ialp])
+    ax[ialp].set_xticks(np.arange(0,250,50))
+    ax[ialp].set_xlim([15,radii[-1]])
+sns.despine(fig=fig, top=True, right=True,offset=3)
+# my_savefig(fig,savedir,'FracMod_min_distance_V1PM_%dsessions' % nSessions)
 
 
 # #%%

@@ -1,5 +1,5 @@
 #%% 
-import os, math
+import os
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -14,7 +14,7 @@ import statsmodels.formula.api as smf
 from statsmodels.stats.anova import anova_lm
 from statsmodels.formula.api import ols
 
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *
@@ -23,6 +23,7 @@ from utils.pair_lib import *
 from utils.plot_lib import * #get all the fixed color schemes
 from utils.regress_lib import *
 from utils.tuning import *
+from utils.gain_lib import *
 
 savedir =  os.path.join(get_local_drive(),'OneDrive\\PostDoc\\Figures\\Affine_FF_vs_FB\\ControlAL\\')
 
@@ -51,7 +52,7 @@ for ises in range(nSessions):
 sessions = ori_remapping(sessions)
 sessions = compute_tuning_wrapper(sessions)
 
-#%%
+#%% Compute nearby cells (for subsampling in some analyses to control for spatial clustering of recorded neurons)
 for ises in range(nSessions):   
     sessions[ises].celldata['nearby'] = filter_nearlabeled(sessions[ises],radius=params['radius'])
 
@@ -87,6 +88,7 @@ arealabelpairs  = [
 # clrs_labeled = get_clr_labeled(['unl','lab'])
 
 
+
 #%% Show tuning curve when activity in the other area is low or high (only still trials)
 narealabelpairs         = len(arealabelpairs)
 
@@ -106,17 +108,17 @@ nboots                  = 0
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
-#Correlation output:
-corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
-corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
+#Dprime output:
+ndprimeboots            = 250
+# ndprimeboots = 0
+dprimedata              = np.full((narealabelpairs,nCells),np.nan)
+dprimesig              = np.full((narealabelpairs,nCells),np.nan)
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
 
-    # idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-                                # sessions[ises].respmat_runspeed < maxrunspeed)
     idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
                             sessions[ises].respmat_runspeed < params['maxrunspeed'])
     
@@ -127,9 +129,9 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         idx_N3              = np.where(sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2])[0]
 
-        if len(idx_N1) < params['minnneurons'] or len(idx_N2) < params['minnneurons'] or len(idx_N3) < params['minnneurons']:
+        if len(idx_N1) < params['minnneurons'] or len(idx_N3) < params['minnneurons']:
             continue
-                
+        
         if params['activitymetric'] == 'mean':#Just mean activity:
             meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
         elif params['activitymetric'] == 'ratio': #Ratio:
@@ -164,7 +166,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         for n in range(N):
             xdata = meanresp[n,:,0]
             ydata = meanresp[n,:,1]
-            regressdata[n,:] = linregress(xdata,ydata)[:3]
+            regressdata[n,:] = stats.linregress(xdata,ydata)[:3]
         params_regress[idx_ses,ialp,:] = regressdata[idx_N3]
 
         if nboots:
@@ -179,7 +181,7 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
                     meanrespboot[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
                     meanrespboot[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
                 for n in range(N):
-                    bootregressdata[n,iboot,:] = linregress(meanrespboot[n,:,0],meanrespboot[n,:,1])[:3]
+                    bootregressdata[n,iboot,:] = stats.linregress(meanrespboot[n,:,0],meanrespboot[n,:,1])[:3]
 
             bootregress_sig[regressdata[:,0]>np.percentile(bootregressdata[:,:,0],97.5,axis=1),0] = 1
             bootregress_sig[regressdata[:,0]<np.percentile(bootregressdata[:,:,0],2.5,axis=1),0] = -1
@@ -190,7 +192,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         #Aligned:
         prefori                     = np.argmax(np.mean(meanresp,axis=2),axis=1)
-        # prefori                     = np.argmax(meanresp[:,:,0],axis=1)
 
         meanresp_pref          = meanresp.copy()
         for n in range(N):
@@ -198,21 +199,77 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
             meanresp_pref[n,:,1] = np.roll(meanresp[n,:,1],-prefori[n])
 
         # normalize by peak response
-        tempmin,tempmax = meanresp_pref[:,:,0].min(axis=1,keepdims=True),meanresp_pref[:,:,0].max(axis=1,keepdims=True)
-        meanresp_pref[:,:,0] = (meanresp_pref[:,:,0] - tempmin) / (tempmax - tempmin)
-        meanresp_pref[:,:,1] = (meanresp_pref[:,:,1] - tempmin) / (tempmax - tempmin)
+        # tempmin,tempmax = meanresp_pref[:,:,0].min(axis=1,keepdims=True),meanresp_pref[:,:,0].max(axis=1,keepdims=True)
+        # meanresp_pref[:,:,0] = (meanresp_pref[:,:,0] - tempmin) / (tempmax - tempmin)
+        # meanresp_pref[:,:,1] = (meanresp_pref[:,:,1] - tempmin) / (tempmax - tempmin)
 
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
-        tempcorr          = np.array([pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
-        tempsig          = np.array([pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
-        corrdata_cells[ialp,idx_ses] = tempcorr
-        tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
-        corrsig_cells[ialp,idx_ses] = tempsig
+        #dprime metric:
+        idx_K1 = np.array([],dtype=int)
+        idx_K2 = np.array([],dtype=int)
+        for i,ori in enumerate(oris):
+            idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
+            idx_K1_T = np.where(np.logical_and(idx_T,meanpopact < np.nanpercentile(meanpopact[idx_T],params['splitperc'])))[0]
+            idx_K1              = np.concatenate((idx_K1,idx_K1_T))
+            idx_K2_T = np.where(np.logical_and(idx_T,meanpopact > np.nanpercentile(meanpopact[idx_T],100-params['splitperc'])))[0]
+            idx_K2              = np.concatenate((idx_K2,idx_K2_T))
+        
+        dprime_ses = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
 
+        dprimedata[ialp,idx_ses] = dprime_ses[idx_N3]
+
+        if ndprimeboots:
+            bootdprimedata  = np.full((N,ndprimeboots),np.nan)
+            bootdprime_sig  = np.full((N),0)
+            for iboot in range(ndprimeboots):
+                idx_K1              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+                idx_K2              = np.random.choice(np.where(idx_T_still)[0],size=np.sum(idx_T_still)*params['splitperc']//100,replace=False)
+               
+                bootdprimedata[:,iboot] = compute_dprime_mat(respdata[:,idx_K2],respdata[:,idx_K1])
+
+            bootdprime_sig[dprime_ses>np.percentile(bootdprimedata,100-(params['dprime_alpha']/2*100),axis=1)] = 1
+            bootdprime_sig[dprime_ses<np.percentile(bootdprimedata,params['dprime_alpha']/2*100,axis=1)] = -1
+
+            dprimesig[ialp,idx_ses] = bootdprime_sig[idx_N3]
+        
 # Compute same metric as Flora:
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
+
+#%% Show pie chart of significant correlation for feedforward and feedback:
+sigmat = np.empty((3,narealabelpairs))
+# signorder = [-1,0,1]
+# signlabels = ['Neg','None','Pos']
+signorder = [-1,1,0]
+signlabels = ['Neg','Pos','None']   
+clrs_signs = ['#0033B3','#E66804','#808080']
+legendlabels        = ['FF','FB']
+targetarealabels    = ['PM','V1']
+
+legendlabels        = ['V1-PM','PM-V1','V1-AL','PM-AL']
+targetarealabels    = ['PM','V1','AL','AL']
+
+for ialp,alp in enumerate(arealabelpairs):
+    for isign,sign in enumerate(signorder):
+        # idx_N = np.logical_and(rangeresp>params['minrangeresp'],~np.isnan(corrdata_cells[ialp,:]))
+        idx_N = ~np.isnan(dprimesig[ialp,:])
+        sigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N) / (1+np.abs(sign)*(ialp//2))
+
+#Make the figure:
+fig,axes = plt.subplots(1,narealabelpairs,figsize=(narealabelpairs*3*cm,3.5*cm))
+for ialp,alp in enumerate(arealabelpairs):
+    ax = axes[ialp]
+    ax.pie([sigmat[0,ialp],sigmat[1,ialp],sigmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
+            startangle=90,counterclock=False,wedgeprops = {'linewidth': 0.8, 'edgecolor': 'black', 'alpha': 0.7},
+            textprops={'fontsize': 7})
+    ax.set_title('%s\nn=%d' % (legendlabels[ialp],np.sum(~np.isnan(dprimesig[ialp,:]))))
+# my_savefig(fig,savedir,'Dprime_Sign_PieCharts_%dsessions_controlAL' % nSessions)
+
+
+
+#%% Deprecated: 
+
 
 #%% 
 nresamples = 1
