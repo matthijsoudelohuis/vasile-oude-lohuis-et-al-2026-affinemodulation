@@ -195,7 +195,7 @@ for example_cell in example_cells:
     ax.set_xlim([t_axis[0],np.max([t_axis[-1],xanchor+0.1])])
     ax.set_ylim([-0.1,np.nanmax(ymean+yerror)*1.2])
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Activity (dc/dF0)')
+    ax.set_ylabel('Activity (ev/F0)')
 
     ax.plot([xanchor,xanchor],[yanchor,yanchor+0.5],color='black',ls='-',linewidth=2,solid_capstyle='butt')
     

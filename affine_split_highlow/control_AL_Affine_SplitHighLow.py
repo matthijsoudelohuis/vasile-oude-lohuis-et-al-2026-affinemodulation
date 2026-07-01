@@ -238,14 +238,18 @@ rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
 #%% Show pie chart of significant correlation for feedforward and feedback:
-sigmat = np.empty((3,narealabelpairs))
+fracmat = np.empty((3,narealabelpairs))
+nsigmat = np.empty((3,narealabelpairs))
+ntotalmat = np.empty((3,narealabelpairs))
+testmat   = np.full((2,2),np.nan)
+
 # signorder = [-1,0,1]
 # signlabels = ['Neg','None','Pos']
 signorder = [-1,1,0]
 signlabels = ['Neg','Pos','None']   
 clrs_signs = ['#0033B3','#E66804','#808080']
-legendlabels        = ['FF','FB']
-targetarealabels    = ['PM','V1']
+# legendlabels        = ['FF','FB']
+# targetarealabels    = ['PM','V1']
 
 legendlabels        = ['V1-PM','PM-V1','V1-AL','PM-AL']
 targetarealabels    = ['PM','V1','AL','AL']
@@ -254,17 +258,61 @@ for ialp,alp in enumerate(arealabelpairs):
     for isign,sign in enumerate(signorder):
         # idx_N = np.logical_and(rangeresp>params['minrangeresp'],~np.isnan(corrdata_cells[ialp,:]))
         idx_N = ~np.isnan(dprimesig[ialp,:])
-        sigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N) / (1+np.abs(sign)*(ialp//2))
+        nsigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / (1+np.abs(sign)*(ialp//2))
+        ntotalmat[isign,ialp] = np.sum(idx_N)
+        fracmat[isign,ialp] = nsigmat[isign,ialp] / ntotalmat[isign,ialp]
 
-#Make the figure:
+#%% Make the figure:
 fig,axes = plt.subplots(1,narealabelpairs,figsize=(narealabelpairs*3*cm,3.5*cm))
 for ialp,alp in enumerate(arealabelpairs):
     ax = axes[ialp]
-    ax.pie([sigmat[0,ialp],sigmat[1,ialp],sigmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
+    ax.pie([fracmat[0,ialp],fracmat[1,ialp],fracmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
             startangle=90,counterclock=False,wedgeprops = {'linewidth': 0.8, 'edgecolor': 'black', 'alpha': 0.7},
             textprops={'fontsize': 7})
     ax.set_title('%s\nn=%d' % (legendlabels[ialp],np.sum(~np.isnan(dprimesig[ialp,:]))))
 # my_savefig(fig,savedir,'Dprime_Sign_PieCharts_%dsessions_controlAL' % nSessions)
+
+for ipair,pair in enumerate(np.array([[0,2],[1,3]])):
+    for isign,sign in enumerate(signorder[:2]):
+        data = np.array([[nsigmat[isign,pair[0]], ntotalmat[isign,pair[0]]-nsigmat[isign,pair[0]]],
+                         [nsigmat[isign,pair[1]], ntotalmat[isign,pair[1]]-nsigmat[isign,pair[1]]]])
+        if np.any(data[:,0]):
+            # testmat[imult,iadd] = stats.chi2_contingency(data)[1]  # p-value
+            chival,pval = stats.chi2_contingency(data)[:2]  # p-value
+            print('%s vs %s: %s: chi=%1.2f, p=%1.4f' % (legendlabels[pair[0]],legendlabels[pair[1]],
+                                                      signlabels[isign],chival,pval))
+# testmat = testmat * ncomparisons  #bonferroni correction
+
+#%% Make it a bar chart: 
+legendlabels = ['FF','FB']
+fig,axes = plt.subplots(1,4,figsize=(4*1.6*cm,3.5*cm),sharey=True)
+for isign,sign in enumerate(signorder[:2]):
+    for ipair,pair in enumerate(np.array([[0,2],[1,3]])):
+        ax = axes[isign+ipair*2]
+        ax.bar([0,1],fracmat[isign,pair],width=0.6,color=clrs_signs[isign],edgecolor='black',linewidth=0.8,alpha=0.7)
+        if isign == 0 and ipair == 0:
+            ax.set_ylabel('Fraction of cells')
+        print('%s\nn=%d cells (%s)\nn=%d cells (%s)' % (
+                                                        legendlabels[ipair],
+                                                        np.sum(~np.isnan(dprimesig[pair[0],:])),
+                                                        targetarealabels[pair[0]],
+                                                        np.sum(~np.isnan(dprimesig[pair[1],:])),
+                                                        targetarealabels[pair[1]]
+                                                        ))
+        ax.set_title('%s: %s' % (legendlabels[ipair],signlabels[isign]),fontsize=6)
+        ax.set_xticks([0,1],labels=[targetarealabels[pair[0]],targetarealabels[pair[1]]])
+        
+        data = np.array([[nsigmat[isign,pair[0]], ntotalmat[isign,pair[0]]-nsigmat[isign,pair[0]]],
+                         [nsigmat[isign,pair[1]], ntotalmat[isign,pair[1]]-nsigmat[isign,pair[1]]]])
+        if np.any(data[:,0]):
+            chival,pval = stats.chi2_contingency(data)[:2]  # p-value
+            print('%s, %s vs %s: %s: chi=%1.2f, p=%1.3e' % (legendlabels[ipair],targetarealabels[pair[0]],targetarealabels[pair[1]],
+                                                      signlabels[isign],chival,pval))
+            
+        add_stat_annotation(ax,x1=0,x2=1,y=0.18,h=0.01,p=pval)
+
+sns.despine(fig=fig, top=True, right=True,offset=2)
+my_savefig(fig,savedir,'Dprime_Sign_BarChart_%dsessions_controlAL' % nSessions)
 
 
 

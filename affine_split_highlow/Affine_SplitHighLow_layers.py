@@ -12,7 +12,7 @@ from scipy.stats import linregress,binned_statistic,pearsonr,spearmanr,ks_2samp
 from scipy import stats
 from statsmodels.formula.api import ols
 
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.get_data_folder import get_local_drive
@@ -129,8 +129,8 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-# nboots                  = 0
-nboots                  = 250
+nboots                  = 0
+# nboots                  = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
@@ -326,7 +326,10 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'dprime_%s_DiffLayers_%dsessions' % (direction,nSessions))
 
 #%% Show pie chart of significant correlation for feedforward and feedback:
-sigmat = np.empty((3,narealabelpairs))
+fracmat = np.empty((3,narealabelpairs))
+nsigmat = np.empty((3,narealabelpairs))
+ntotalmat = np.empty((3,narealabelpairs))
+
 signorder = [-1,0,1]
 signlabels = ['Neg','None','Pos']
 signorder = [-1,1,0]
@@ -335,20 +338,28 @@ clrs_signs = ['#0033B3','#E66804','#808080']
 for ialp,alp in enumerate(arealabelpairs):
     for isign,sign in enumerate(signorder):
         idx_N = ~np.isnan(dprimedata[ialp,:])
-
-        sigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N)
+        nsigmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign)
+        ntotalmat[isign,ialp] = np.sum(idx_N)
+        fracmat[isign,ialp] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N)
 
 #Make the figure:
 fig,axes = plt.subplots(1,2,figsize=(7*cm,4*cm))
 for ialp,alp in enumerate(arealabelpairs):
     ax = axes[ialp]
-    ax.pie([sigmat[0,ialp],sigmat[1,ialp],sigmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
+    ax.pie([fracmat[0,ialp],fracmat[1,ialp],fracmat[2,ialp]],labels=signlabels,colors=clrs_signs,autopct='%1.1f%%',
             startangle=90,counterclock=False,wedgeprops = {'linewidth': 0.8, 'edgecolor': 'black', 'alpha': 0.7},
             textprops={'fontsize': 6})
     ax.set_title('%s\nn=%d' % (legendlabels[ialp],np.sum(~np.isnan(dprimedata[ialp,:]))))
-    # ax.text(-0.1,0.1,'n=%d' % np.sum(~np.isnan(dprimedata[ialp,:])),transform=ax.transAxes,ha='center',va='center',
-    #         fontsize=6)
-my_savefig(fig,savedir,'Dprime_%s_Sign_PieCharts_%dsessions' % (direction,nSessions))
+# my_savefig(fig,savedir,'Dprime_%s_Sign_Layers_PieCharts_%dsessions' % (direction,nSessions))
+
+for ipair,pair in enumerate(np.array([[0,1]])):
+    for isign,sign in enumerate(signorder[:2]):
+        data = np.array([[nsigmat[isign,pair[0]], ntotalmat[isign,pair[0]]-nsigmat[isign,pair[0]]],
+                         [nsigmat[isign,pair[1]], ntotalmat[isign,pair[1]]-nsigmat[isign,pair[1]]]])
+        if np.any(data[:,0]):
+            chival,pval = stats.chi2_contingency(data)[:2]  # p-value
+            print('%s vs %s: %s: chi=%1.2f, p=%1.4f' % (legendlabels[pair[0]],legendlabels[pair[1]],
+                                                      signlabels[isign],chival,pval))
 
 
 #%% Fraction of significant multiplicative and additively modulated cells:

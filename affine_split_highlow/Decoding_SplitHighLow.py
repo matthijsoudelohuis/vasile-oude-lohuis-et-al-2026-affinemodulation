@@ -11,7 +11,7 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from scipy import stats
 from statsmodels.stats.anova import AnovaRM
 
-os.chdir('c:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
+os.chdir('e:\\Python\\vasile-oude-lohuis-et-al-2026-affinemodulation')
 
 from params import load_params
 from loaddata.session_info import *

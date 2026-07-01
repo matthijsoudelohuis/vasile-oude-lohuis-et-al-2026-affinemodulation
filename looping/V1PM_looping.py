@@ -1009,7 +1009,7 @@ for irad,radius in enumerate(tqdm(radii,total=nradii,desc='Bootstrapping for dif
             if hasnearby[iN]:
                 idx_boot[iN] = np.random.choice(idx_within_radius,1)
         idx_boot                    = idx_boot[hasnearby].astype(int)
-
+        # idx_N = 
         bootaffine[iapl,0,irad,iboot] = np.nanmean(params_regress[idx_boot,:,0]) #multiplicative slope
         bootaffine[iapl,1,irad,iboot] = np.nanmean(params_regress[idx_boot,:,1]) #additive offset
 
@@ -1069,7 +1069,7 @@ for ialp in range(2):
             pval = np.sum(loopdata_subplots[ialp,irad,imetric] > bootdata_subplots[ialp,irad,imetric,:]) / nboots
             pval = np.min([pval,1-pval])
             pval *= nradii
-             
+            
             # ax.text((irad+1)/len(radii),loopdata_subplots[ialp,irad,imetric]+axisbuffer,get_sig_asterisks(pval),
             ax.text(radius,loopdata_subplots[ialp,irad,imetric]-axisbuffer,get_sig_asterisks(pval),
                     fontsize=7,ha='center',va='top',color='k',rotation=45)
@@ -1078,7 +1078,7 @@ for ialp in range(2):
             # axes[ialp,axidx].axhline(1,color='grey',linewidth=1,linestyle='--')
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=3)
-my_savefig(fig,savedir,'Looped_Affine_Bootstrap_Radii_dprime')
+# my_savefig(fig,savedir,'Looped_Affine_Bootstrap_Radii_dprime')
 
 
 #%% 
