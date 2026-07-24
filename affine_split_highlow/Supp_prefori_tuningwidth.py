@@ -74,8 +74,8 @@ mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
-ndprimeboots            = 0
-# ndprimeboots            = 250
+# ndprimeboots            = 0
+ndprimeboots            = 250
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
 
@@ -197,24 +197,51 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
         # for iN in range(N):
         for iN in idx_N3:
             # print(iN)
+            # p0 = [1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0]
             try:
-                # popt1, pcov = curve_fit(vonmises, xdata, meanresp[iN,:,0],p0=[1,xdata[np.argmax(meanresp[iN,:,0])],0.25])
-                popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,0],p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0])
+                ydata = meanresp[iN,:,0]
+                bounds = ([0,0,0,2*math.pi/48,0],[(np.max(ydata)-np.min(ydata))*1.5,(np.max(ydata)-np.min(ydata))*1.5,2*math.pi,np.inf,1])
+                p0 = [np.max(ydata)-np.min(ydata),np.max(ydata)-np.min(ydata),xdata[np.argmax(ydata)],2*math.pi/16,0.01]
+                popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ydata,p0=p0,bounds=bounds)
                 # popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,0],
                 #                            p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0],
                 #                            bounds=([0,0,0,0,0],[np.inf,np.inf,2*math.pi,np.inf,np.inf]))
-                
                 VM_data_ses[iN,:,0] = popt_low
-                popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,0],p0=[1,1,xdata[np.argmax(meanresp_shuf[iN,:,0])],0.25,0])
+
+                ydata = meanresp_shuf[iN,:,0]
+                bounds = ([0,0,0,2*math.pi/48,0],[(np.max(ydata)-np.min(ydata))*1.5,(np.max(ydata)-np.min(ydata))*1.5,2*math.pi,np.inf,1])
+                p0 = [np.max(ydata)-np.min(ydata),np.max(ydata)-np.min(ydata),xdata[np.argmax(ydata)],2*math.pi/16,0.01]
+                popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ydata,p0=p0,bounds=bounds)
+            
+                # popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,0],p0=p0,bounds=bounds)
                 VM_data_ses_shuffled[iN,:,0] = popt_low_shuf
             except:
                 continue
 
+            # p0 = [1,1,xdata[np.argmax(meanresp[iN,:,1])],0.25,0]
+
             try:
-                popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,1],p0=[1,1,xdata[np.argmax(meanresp[iN,:,1])],0.25,0])
+                ydata = meanresp[iN,:,1]
+                bounds = ([0,0,0,2*math.pi/48,0],[(np.max(ydata)-np.min(ydata))*1.5,(np.max(ydata)-np.min(ydata))*1.5,2*math.pi,np.inf,1])
+                p0 = [np.max(ydata)-np.min(ydata),np.max(ydata)-np.min(ydata),xdata[np.argmax(ydata)],2*math.pi/16,0.01]
+                popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ydata,p0=p0,bounds=bounds)
+                # popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,0],
+                #                            p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0],
+                #                            bounds=([0,0,0,0,0],[np.inf,np.inf,2*math.pi,np.inf,np.inf]))
                 VM_data_ses[iN,:,1] = popt_high
-                popt_high_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,1],p0=[1,1,xdata[np.argmax(meanresp_shuf[iN,:,1])],0.25,0])
+
+                ydata = meanresp_shuf[iN,:,1]
+                bounds = ([0,0,0,2*math.pi/48,0],[(np.max(ydata)-np.min(ydata))*1.5,(np.max(ydata)-np.min(ydata))*1.5,2*math.pi,np.inf,1])
+                p0 = [np.max(ydata)-np.min(ydata),np.max(ydata)-np.min(ydata),xdata[np.argmax(ydata)],2*math.pi/16,0.01]
+                popt_high_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ydata,p0=p0,bounds=bounds)
+            
+                # popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,0],p0=p0,bounds=bounds)
                 VM_data_ses_shuffled[iN,:,1] = popt_high_shuf
+
+                # popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,1],p0=p0,bounds=bounds)
+                # VM_data_ses[iN,:,1] = popt_high
+                # popt_high_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,1],p0=p0,bounds=bounds)
+                # VM_data_ses_shuffled[iN,:,1] = popt_high_shuf
             except:
                 continue
 
@@ -352,6 +379,10 @@ rangeresp = np.nanmax(rangeresp,axis=(0,1))
 VM_data[:,2,:,:] = np.mod(np.degrees(VM_data[:,2,:,:]),360)
 VM_data_shuffled[:,2,:,:] = np.mod(np.degrees(VM_data_shuffled[:,2,:,:]),360)
 
+#%%
+VM_data[:,3,:,:] = np.degrees(VM_data[:,3,:,:])
+VM_data_shuffled[:,3,:,:] = np.degrees(VM_data_shuffled[:,3,:,:])
+
 #%% 
 legendlabels = ['FF','FB']
 clrs_arealabelpairs = get_clr_arealabelpairs(arealabelpairs)
@@ -389,14 +420,19 @@ for example_cell in example_cells:
     ax = axes
     #Low activity in other area
     ax.scatter(ustim,ylow,color=clrs_arealabels_low_high[ialp,0],s=20)
-    popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ylow,p0=[1,1,xdata[np.argmax(ylow)],0.25,0])
+    bounds = ([0,0,0,2*math.pi/48,0],[(np.max(ylow)-np.min(ylow))*1.5,(np.max(ylow)-np.min(ylow))*1.5,2*math.pi,np.inf,1])
+    p0 = [np.max(ylow)-np.min(ylow),np.max(ylow)-np.min(ylow),xdata[np.argmax(ylow)],2*math.pi/16,0.01]
+    popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ylow,p0=p0,bounds=bounds)
+    # popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ylow,p0=[1,1,xdata[np.argmax(ylow)],0.25,0])
     # popt1, pcov = curve_fit(double_vonmises_pi_constrained, xdata, ylow,p0=[1,1,xdata[np.argmax(ylow)],0.25])
     xfit = np.linspace(0,2*math.pi,100)
     yfit = double_vonmises_pi_constrained(xfit, *popt_low)
     ax.plot(np.degrees(xfit),yfit,color=clrs_arealabels_low_high[ialp,0],linestyle='-',linewidth=0.8)
     #High activity in other area
     ax.scatter(ustim,yhigh,color=clrs_arealabels_low_high[ialp,1],s=20)
-    popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, yhigh,p0=[1,1,xdata[np.argmax(yhigh)],0.25,0])
+    bounds = ([0,0,0,2*math.pi/48,0],[(np.max(yhigh)-np.min(yhigh))*1.5,(np.max(yhigh)-np.min(yhigh))*1.5,2*math.pi,np.inf,1])
+    p0 = [np.max(yhigh)-np.min(yhigh),np.max(yhigh)-np.min(yhigh),xdata[np.argmax(yhigh)],2*math.pi/16,0.01]
+    popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, yhigh,p0=p0,bounds=bounds)
     xfit = np.linspace(0,2*math.pi,100)
     yfit = double_vonmises_pi_constrained(xfit, *popt_high)
     ax.plot(np.degrees(xfit),yfit,color=clrs_arealabels_low_high[ialp,1],linestyle='-',linewidth=0.8)
@@ -418,7 +454,8 @@ histres1D = 2.5
 # fig,axes = plt.subplots(1,3,figsize=(6,3),sharex=,sharey=True)
 fig,axes = plt.subplots(1,3,figsize=(9,3))
 
-PO_data = VM_data[:,1,:,:] #extract preferred orientation
+PO_data = VM_data[:,2,:,:] #extract preferred orientation
+# PO_data = VM_data[:,1,:,:] #extract preferred orientation
 
 idx_N = rangeresp>0.04
 ax = axes[0]
@@ -460,17 +497,20 @@ plt.tight_layout()
 
 #%% 
 fig,axes = plt.subplots(2,nparams,figsize=(nparams*2,3),sharex='col')
-idx_N = rangeresp>0.04
-idx_N = np.all((rangeresp>0.04, 
+idx_N = np.all((rangeresp>params['minrangeresp'],
                 # VM_data[:,3,0,:]!=0, 
                 # VM_data[:,3,1,:]!=0,
                 # np.any(VM_data[:,3,:,:]>0, axis=(0,1)),
                 # ~np.any(VM_data[:,3,:,:]==0, axis=(0,1)),
-                ~np.any(VM_data[:,3,:,:]<=0, axis=(0,1)),
-                ~np.any(VM_data[:,3,:,:]>30, axis=(0,1)),
+                # ~np.any(VM_data[:,3,:,:]<=0, axis=(0,1)),
+                # ~np.any(VM_data[:,3,:,:]>30, axis=(0,1)),
                 # np.any(VM_data[:,3,:,:]<30, axis=(0,1)),
                 ),axis=0)
 trimperc = 2 #trim percentile on each side
+
+binedges = [4*np.arange(-0.2,0.2,0.01),np.arange(-0.2,0.2,0.01),
+                     np.arange(-180,180,5),np.arange(-15,16,1),
+                     np.arange(-0.1,0.1,0.005)]
 
 for iparam,param in enumerate(param_names):
     for ialp in range(narealabelpairs):
@@ -485,26 +525,26 @@ for iparam,param in enumerate(param_names):
         datadiff = np.mod(datadiff + 180,360) - 180  #wrap to -180 to 180
         shufdatadiff = np.mod(shufdatadiff + 180,360) - 180  #wrap to -180 to 180
 
-        bins = np.linspace(np.nanpercentile(datadiff[idx_N],trimperc),np.nanpercentile(datadiff[idx_N],100-trimperc),20)
-        
-        sns.histplot(datadiff[idx_N],color=clrs_arealabelpairs[ialp],element="step",stat="count", 
+        # bins = np.linspace(np.nanpercentile(datadiff[idx_N],trimperc),np.nanpercentile(datadiff[idx_N],100-trimperc),20)
+        bins = binedges[iparam]
+        sns.histplot(datadiff[idx_N],color=clrs_arealabelpairs[ialp],element="bars",stat="probability", 
                     common_norm=False,alpha=0.2,ax=ax,bins=bins)
-        sns.histplot(shufdatadiff[idx_N],color='grey',element="step",stat="count", 
+        sns.histplot(shufdatadiff[idx_N],color='grey',element="bars",stat="probability", 
                     common_norm=False,alpha=0.2,ax=ax,bins=bins,linestyle='dashed')
 
         if ialp==1: 
             ax.set_xlabel(param)
-        if iparam==0: 
-            ax.set_ylabel(f'Counts')
-        else:
-            ax.set_ylabel('')
-        if iparam==0:
-            ax.text(0.5,0.8,'%s (High-low)' % legendlabels[ialp],color=clrs_arealabelpairs[ialp],transform=ax.transAxes,fontsize=7)
-            ax.text(0.5,0.6,'Shuffle',color='grey',transform=ax.transAxes,fontsize=7)
+        # if iparam==0: 
+        ax.set_ylabel(f'Fraction')
+        # else:
+            # ax.set_ylabel('')
+        # if iparam==0:
+        # ax.text(0.5,0.8,'%s (High-low)' % legendlabels[ialp],color=clrs_arealabelpairs[ialp],transform=ax.transAxes,fontsize=7)
+        # ax.text(0.5,0.6,'Shuffle',color='grey',transform=ax.transAxes,fontsize=7)
 
 plt.tight_layout()
 sns.despine(fig,top=True,right=True,offset=2)
-# my_savefig(fig,savedir,'VonMises_TuningParameters_Diff_FF_FB')
+my_savefig(fig,savedir,'VonMises_TuningParameters_Diff_FF_FB')
 
 #%% 
 # fig,axes = plt.subplots(2,nparams,figsize=(nparams*3*cm,7*cm),sharex='col')

@@ -134,7 +134,7 @@ nboots                  = 0
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
-ndprimeboots            = 250
+ndprimeboots            = 1000
 # ndprimeboots = 0
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
@@ -225,12 +225,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 
         mean_resp_split_aligned[ialp,:,:,idx_ses] = meanresp_pref[idx_N3]
 
-        tempcorr          = np.array([stats.pearsonr(meanpopact,respdata[n,:])[0] for n in idx_N3])
-        tempsig          = np.array([stats.pearsonr(meanpopact,respdata[n,:])[1] for n in idx_N3])
-        corrdata_cells[ialp,idx_ses] = tempcorr
-        tempsig = (tempsig<params['alpha_crossrate']) * np.sign(tempcorr)
-        corrsig_cells[ialp,idx_ses] = tempsig
-
         #dprime metric:
         idx_K1 = np.array([],dtype=int)
         idx_K2 = np.array([],dtype=int)
@@ -306,7 +300,6 @@ filename = 'Example_plane_dprime_V1L5_session%d_plane%d.pdf' % (ises,iplane)
 
 
 #%% Are neurons similarly modulated by FB from L2/3 or L5?
-
 fig,axes = plt.subplots(1,1,figsize=(4*cm,3.7*cm))
 # ax = axes[ialp]
 ax = axes
@@ -362,6 +355,37 @@ for ipair,pair in enumerate(np.array([[0,1]])):
                                                       signlabels[isign],chival,pval))
 
 
+#%% Make it a bar chart: 
+fig,axes = plt.subplots(1,2,figsize=(2*1.6*cm,3.5*cm),sharey=True)
+for isign,sign in enumerate(signorder[:2]):
+    ax = axes[isign]
+    ax.bar([0,1],fracmat[isign,:],width=0.6,color=clrs_signs[isign],edgecolor='black',linewidth=0.8,alpha=0.7)
+    if isign == 0 and ipair == 0:
+        ax.set_ylabel('Fraction of cells')
+    print('%s\nn=%d cells (%s)\nn=%d cells (%s)' % (
+                                                    signlabels[isign],
+                                                    np.sum(~np.isnan(dprimesig[0,:])),
+                                                    legendlabels[0],
+                                                    np.sum(~np.isnan(dprimesig[1,:])),
+                                                    legendlabels[1],
+                                                    ))
+    ax.set_title('%s' % signlabels[isign],fontsize=6)
+    
+    data = np.array([[nsigmat[isign], ntotalmat[isign]-nsigmat[isign]],
+                        [nsigmat[isign], ntotalmat[isign]-nsigmat[isign]]])
+    if np.any(data[:,0]):
+        chival,pval = stats.chi2_contingency(data)[:2]  # p-value
+        print('%s, %s vs %s: chi=%1.2f, p=%1.3e' % (signlabels[isign],legendlabels[0],legendlabels[1],
+                                                    chival,pval))    
+    add_stat_annotation(ax,x1=0,x2=1,y=0.18,h=0.01,p=pval)
+
+sns.despine(fig=fig, top=True, right=True,offset=2)
+for ax in axes:
+    ax.set_xticks([0,1],labels=[legendlabels[0],legendlabels[1]],fontsize=4,rotation=90)
+
+# my_savefig(fig,savedir,'Dprime_Sign_BarChart_FB_Layers_%dsessions' % nSessions)
+my_savefig(fig,savedir,'Dprime_Sign_BarChart_FF_Layers_%dsessions' % nSessions)
+
 #%% Fraction of significant multiplicative and additively modulated cells:
 modsign = -1
 orderversion = 1
@@ -406,7 +430,6 @@ for iafftype in [0,1]: # 0 = multiplicative, 1 = additive
             print(xpos)
             ax.bar(xpos,fracs[ialp],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
         
-
         if np.any(fracs>0):
             pval = stats.chi2_contingency([[sigmat[iafftype,0], countmat[iafftype,0]-sigmat[iafftype,0]],
                                 [sigmat[iafftype,1], countmat[iafftype,1]-sigmat[iafftype,1]]])[1]

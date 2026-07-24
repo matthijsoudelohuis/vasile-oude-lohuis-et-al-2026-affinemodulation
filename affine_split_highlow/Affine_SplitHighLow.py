@@ -570,6 +570,79 @@ for ialp in range(narealabelpairs):
     print('%s: r = %1.2f (std = %1.2f), p = %1.2f' % (arealabelpairs[ialp],np.nanmean(corrdata_targetarea_ses[ialp,:]),
                                                      np.nanstd(corrdata_targetarea_ses[ialp,:]),stats.ttest_1samp(corrdata_targetarea_ses[ialp,:],0,nan_policy='omit').pvalue))
 
+#%% Is the difference metric consistent between different subsamples of neurons? 
+sampleneurons   = np.array([1,10,20,30,40,50,60,70])
+nsampleneurons  = len(sampleneurons)
+nresamples      = 75
+corrdata        = np.full((nSessions,2,nsampleneurons,nresamples),np.nan)
+nlabeled_neurons = np.full((nSessions,2),np.nan)
+for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
+    respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
+
+    idx_T_still = np.logical_and(sessions[ises].respmat_videome < params['maxvideome'],
+                            sessions[ises].respmat_runspeed < params['maxrunspeed'])
+    for ialp,alp in enumerate(arealabelpairs):
+        idx_N1              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[0],
+                                                    sessions[ises].celldata['nearby']
+                                                    ),axis=0))[0]
+        idx_N2              = np.where(np.all((sessions[ises].celldata['arealabel'] == alp.split('-')[1],
+                                                    sessions[ises].celldata['nearby']
+                                                    ),axis=0))[0]
+        nlabeled_neurons[ises,ialp] = len(idx_N1)
+        for iNN,N in enumerate(sampleneurons):
+            if len(idx_N1) < N*2 or len(idx_N2) < N*2:
+                continue
+
+            meanpopact_N2       = np.nanmean(respdata[np.ix_(idx_N2,idx_T_still)],axis=0)
+
+            for isample in range(nresamples):
+                idx_source_N1_1     = np.random.choice(idx_N1,N,replace=False)
+                # idx_source_N2_1     = np.random.choice(idx_N2,N,replace=False)
+                # idx_source_N2_1     = idx_N2
+                # idx_source_N1_2     = np.random.choice(np.setxor1d(idx_N1,idx_source_N1_1),N,replace=False)
+                # idx_source_N2_2     = np.random.choice(np.setxor1d(idx_N2,idx_source_N2_1),N,replace=False)
+                idx_source_N1_2     = np.random.choice(idx_N1,N,replace=False)
+                # idx_source_N2_2     = np.random.choice(idx_N2,N,replace=False)
+                # idx_source_N2_2     = idx_N2
+
+                meanpopact_N1_1       = np.nanmean(respdata[np.ix_(idx_source_N1_1,idx_T_still)],axis=0) #np.nanmean(respdata[idx_source_N1,:],axis=0)
+                # meanpopact_N2_1       = np.nanmean(respdata[np.ix_(idx_source_N2_1,idx_T_still)],axis=0)
+
+                meanpopact_N1_2       = np.nanmean(respdata[np.ix_(idx_source_N1_2,idx_T_still)],axis=0) #np.nanmean(respdata[idx_source_N1,:],axis=0)
+                # meanpopact_N2_2       = np.nanmean(respdata[np.ix_(idx_source_N2_2,idx_T_still)],axis=0)
+
+                # diffpopact_1       = meanpopact_N1_1 - meanpopact_N2_1
+                # diffpopact_2       = meanpopact_N1_2 - meanpopact_N2_2
+
+                diffpopact_1       = meanpopact_N1_1 - meanpopact_N2
+                diffpopact_2       = meanpopact_N1_2 - meanpopact_N2
+
+                corrdata[ises,ialp,iNN,isample] = stats.pearsonr(diffpopact_1,diffpopact_2)[0]
+
+#%% 
+fig,axes = plt.subplots(1,1,figsize=(4*cm,3.5*cm))
+for ialp,alp in enumerate(arealabelpairs):
+    ax = axes
+    ax.plot(sampleneurons,np.nanmean(corrdata[:,ialp,:,:],axis=(0,2)),'-',marker='o',markersize=2,
+            color=clrs_arealabelpairs[ialp],linewidth=1)
+    shaded_error(sampleneurons,np.nanmean(corrdata[:,ialp,:,:].T,axis=(2)),center='mean',error='std',
+            color=clrs_arealabelpairs[ialp],linewidth=1,ax=ax)
+    # for ises in range(nSessions):
+        # if nlabeled_neurons[ises,ialp] > params['minnneurons']:
+            # ax.axvline(nlabeled_neurons[ises,ialp],color=clrs_arealabelpairs[ialp],linestyle='-',linewidth=0.3)
+    nlabeled_neurons[nlabeled_neurons<params['minnneurons']] = np.nan
+    ax.axvline(np.nanmean(nlabeled_neurons[:,ialp]),color=clrs_arealabelpairs[ialp],linestyle='-',lw=0.5)
+    ax.set_xlabel('#neurons sampled')
+    ax.set_ylabel('corr between subsamples')
+    ax.set_xticks(sampleneurons)
+    ax.set_xticks(sampleneurons)
+    ax.set_ylim([0,0.7])
+    ax.set_yticks([0,0.2,0.4,0.6])
+
+sns.despine(fig=fig, top=True, right=True,offset=2)
+# my_savefig(fig,savedir,'InternalConsistency_SubsampleCorr_FF_FB_acrosssessions')
+my_savefig(fig,savedir,'InternalConsistency_SubsampleCorr_FF_FB_acrosssessions_wnNeurons')
+
 #%% Show mean tuning of activity metric across sessions:
 legendlabels = ['FF','FB']
 # fig,ax = plt.subplots(1,1,figsize=(4*cm,3.5*cm))
@@ -625,8 +698,8 @@ corrdata_cells          = np.full((narealabelpairs,nCells),np.nan)
 corrsig_cells           = np.full((narealabelpairs,nCells),np.nan)
 
 # ndprimeboots            = 250
-ndprimeboots            = 1000
-# ndprimeboots = 0
+# ndprimeboots            = 1000
+ndprimeboots = 0
 dprimedata              = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
 
@@ -783,6 +856,15 @@ xdata = xdata[notnan]
 ydata = ydata[notnan]
 print(np.corrcoef(xdata,ydata)[0,1])
 plt.scatter(dprimedata.flatten(),corrdata_cells.flatten())
+
+#%%
+# Compute same metric as Flora:
+rangeresp2 = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
+rangeresp2 = np.nanmax(rangeresp2,axis=(1))
+
+for ialp in range(narealabelpairs):
+    print('%s: %d/%d cells included for affine modulation based on min range resp of %1.2f:' % (arealabelpairs[ialp],
+            np.sum(rangeresp2[ialp,:]>params['minrangeresp']),np.sum(~np.isnan(rangeresp2[ialp,:])),params['minrangeresp']))
 
 #%% Compute overlap between ttest sig and dprime sig:
 for ialp in range(narealabelpairs):
