@@ -156,8 +156,6 @@ my_savefig(fig,savedir,'Autocorrelation_LabUnl_%dsessions' % (nSessions))
 
 
 
-
-
 #%% 
 #          #    #     # ####### ######   #####  
 #         # #    #   #  #       #     # #     # 

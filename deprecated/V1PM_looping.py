@@ -735,7 +735,6 @@ sns.despine(fig=fig, top=True, right=True,offset=3)
 my_savefig(fig,savedir,'Looped_Dprime_Modulations_Bootstrap_Radius%d' % (radius))
 
 
-
 #%% Evaluating potential confound of anatomical proximity:
 # To evaluate potential confounds due to anatomical inhomogeneities in modulations, we first measured the absolute difference in 
 # modulation as a function of distance between pairs of cells, regardless of their projection target. We found that cells that are

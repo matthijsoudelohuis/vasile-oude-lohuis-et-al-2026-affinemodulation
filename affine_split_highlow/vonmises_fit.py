@@ -88,7 +88,7 @@ VM_data             = np.full((narealabelpairs,nparams,2,nCells),np.nan) #dim1: 
 VM_data_shuffled    = np.full((narealabelpairs,nparams,2,nCells),np.nan) #dim1: arealabelpair, dim2: (amp, loc, scale), dim3: low/high, dim4: cell
 
 
-for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
+for ises in tqdm(range(nSessions),total=nSessions,desc='Computing high low von mises tuning'):
     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
 
     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
@@ -252,129 +252,6 @@ for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and
 rangeresp = np.nanmax(mean_resp_split,axis=1) - np.nanmin(mean_resp_split,axis=1)
 rangeresp = np.nanmax(rangeresp,axis=(0,1))
 
-
-# #%% Compute tuning curve when activity in the other area is low or high (only still trials)
-# arealabelpairs  = [
-#                     'V1lab-V1unl-PMunlL2/3',
-#                     'PMlab-PMunl-V1unlL2/3',
-#                     ]
-
-# narealabelpairs         = len(arealabelpairs)
-
-# celldata                = pd.concat([sessions[ises].celldata for ises in range(nSessions)]).reset_index(drop=True)
-
-# nOris                   = 16
-# nCells                  = len(celldata)
-# oris                    = np.sort(sessions[0].trialdata['Orientation'].unique())
-# perc                    = 25
-
-# #criteria for selecting still trials:
-# maxvideome              = 0.2
-# maxrunspeed             = 5
-
-# minnneurons             = 10
-# maxnoiselevel           = 20
-# mean_resp_split         = np.full((narealabelpairs,nOris,2,nCells),np.nan)
-
-# #Output double von mises parameters:
-# param_names           = ['Amplitude (pref)','Amplitude (opposite)',
-#                          'Preferred Orientation','Tuning Width','Offset']
-# # nparams                = 4 #amp1, amp2, loc, scale,
-# nparams                = len(param_names)
-# VM_data             = np.full((narealabelpairs,nparams,2,nCells),np.nan) #dim1: arealabelpair, dim2: (amp, loc, scale), dim3: low/high, dim4: cell
-# VM_data_shuffled    = np.full((narealabelpairs,nparams,2,nCells),np.nan) #dim1: arealabelpair, dim2: (amp, loc, scale), dim3: low/high, dim4: cell
-
-# for ises in tqdm(range(nSessions),total=nSessions,desc='Computing preferred orientation'):
-#     [N,K]           = np.shape(sessions[ises].respmat) #get dimensions of response matrix
-
-#     respdata            = sessions[ises].respmat / sessions[ises].celldata['meanF'].to_numpy()[:,None]
-
-#     idx_T_still = np.logical_and(sessions[ises].respmat_videome/np.nanmax(sessions[ises].respmat_videome) < maxvideome,
-#                                 sessions[ises].respmat_runspeed < maxrunspeed)
-    
-#     for ialp,alp in enumerate(arealabelpairs):
-#         idx_N1              = np.where(np.all((
-#                                     sessions[ises].celldata['arealabel'] == alp.split('-')[0],
-#                                     sessions[ises].celldata['noise_level']<maxnoiselevel,
-#                                       ),axis=0))[0]
-        
-#         idx_N2              = np.where(np.all((
-#                                     sessions[ises].celldata['arealabel'] == alp.split('-')[1],
-#                                     sessions[ises].celldata['noise_level']<maxnoiselevel,
-#                                       ),axis=0))[0]
-
-#         idx_N3              = np.where(np.all((sessions[ises].celldata['arealayerlabel'] == alp.split('-')[2],
-#                                       sessions[ises].celldata['noise_level']<maxnoiselevel,
-#                                       ),axis=0))[0]
-
-#         subsampleneurons = np.min([idx_N1.shape[0],idx_N2.shape[0]])
-#         idx_N1 = np.random.choice(idx_N1,subsampleneurons,replace=False)
-#         idx_N2 = np.random.choice(idx_N2,subsampleneurons,replace=False)
-        
-#         idx_ses = np.isin(celldata['cell_id'],sessions[ises].celldata['cell_id'][idx_N3])
-
-#         if len(idx_N1) < minnneurons or len(idx_N3) < minnneurons:
-#             continue
-        
-#         meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0)
-#         #Difference:
-#         # meanpopact          = np.nanmean(respdata[idx_N1,:],axis=0) - np.nanmean(respdata[idx_N2,:],axis=0)
-#         # meanpopact          = np.nanmean(respdata[idx_N2,:],axis=0) - np.nanmean(respdata[idx_N1,:],axis=0)
-
-#         # compute meanresp for trials with low and high difference in lab-unl activation
-#         meanresp            = np.empty([N,len(oris),2])
-#         meanresp_shuf       = np.empty([N,len(oris),2])
-#         ori_ses             = sessions[ises].trialdata['Orientation']
-#         oris                = np.unique(ori_ses)
-#         for i,ori in enumerate(oris):
-#             idx_T               = np.logical_and(ori_ses == ori,idx_T_still)
-#             idx_K1              = meanpopact < np.nanpercentile(meanpopact[idx_T],perc)
-#             idx_K2              = meanpopact > np.nanpercentile(meanpopact[idx_T],100-perc)
-#             meanresp[:,i,0]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K1)],axis=1)
-#             meanresp[:,i,1]     = np.nanmean(respdata[:,np.logical_and(idx_T,idx_K2)],axis=1)
-
-#             idx_K1              = np.random.choice(np.where(idx_T)[0],np.sum(np.logical_and(idx_T,idx_K1)),replace=False)
-#             idx_K2              = np.random.choice(np.where(idx_T)[0],np.sum(np.logical_and(idx_T,idx_K2)),replace=False)
-#             meanresp_shuf[:,i,0]     = np.nanmean(respdata[:,idx_K1],axis=1)
-#             meanresp_shuf[:,i,1]     = np.nanmean(respdata[:,idx_K2],axis=1)
-
-#         mean_resp_split[ialp,:,:,idx_ses] = meanresp[idx_N3]
-
-#         xdata = np.radians(oris)
-#         # PO_data_ses = np.full((N,2),np.nan)
-#         # TW_data_ses = np.full((N,2),np.nan)
-#         # AM_data_ses = np.full((N,2),np.nan)
-#         VM_data_ses = np.full((N,nparams,2),np.nan)
-#         VM_data_ses_shuffled = np.full((N,nparams,2),np.nan)
-#         for iN in range(N):
-#             try:
-#                 # popt1, pcov = curve_fit(vonmises, xdata, meanresp[iN,:,0],p0=[1,xdata[np.argmax(meanresp[iN,:,0])],0.25])
-#                 popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,0],p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0])
-#                 # popt_low, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,0],
-#                 #                            p0=[1,1,xdata[np.argmax(meanresp[iN,:,0])],0.25,0],
-#                 #                            bounds=([0,0,0,0,0],[np.inf,np.inf,2*math.pi,np.inf,np.inf]))
-                
-#                 VM_data_ses[iN,:,0] = popt_low
-#                 popt_low_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,0],p0=[1,1,xdata[np.argmax(meanresp_shuf[iN,:,0])],0.25,0])
-#                 VM_data_ses_shuffled[iN,:,0] = popt_low_shuf
-#             except:
-#                 continue
-
-#             try:
-#                 popt_high, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp[iN,:,1],p0=[1,1,xdata[np.argmax(meanresp[iN,:,1])],0.25,0])
-#                 VM_data_ses[iN,:,1] = popt_high
-#                 popt_high_shuf, pcov = curve_fit(double_vonmises_pi_constrained, xdata, meanresp_shuf[iN,:,1],p0=[1,1,xdata[np.argmax(meanresp_shuf[iN,:,1])],0.25,0])
-#                 VM_data_ses_shuffled[iN,:,1] = popt_high_shuf
-#             except:
-#                 continue
-
-#         VM_data[ialp,:,:,idx_ses] = VM_data_ses[idx_N3]
-#         VM_data_shuffled[ialp,:,:,idx_ses] = VM_data_ses_shuffled[idx_N3]
-
-#%% Convert tuning width from kappa to 1/kappa
-# VM_data[:,3,:,:] = 1/(VM_data[:,3,:,:]) 
-# VM_data_shuffled[:,3,:,:] = 1/(VM_data_shuffled[:,3,:,:])
-
 #%%
 VM_data[:,2,:,:] = np.mod(np.degrees(VM_data[:,2,:,:]),360)
 VM_data_shuffled[:,2,:,:] = np.mod(np.degrees(VM_data_shuffled[:,2,:,:]),360)
@@ -454,13 +331,14 @@ histres1D = 2.5
 # fig,axes = plt.subplots(1,3,figsize=(6,3),sharex=,sharey=True)
 fig,axes = plt.subplots(1,3,figsize=(9,3))
 
-PO_data = VM_data[:,2,:,:] #extract preferred orientation
+# PO_data = VM_data[:,2,:,:] #extract preferred orientation
 # PO_data = VM_data[:,1,:,:] #extract preferred orientation
+data = VM_data[:,2,:,:] #extract preferred orientation
 
 idx_N = rangeresp>0.04
 ax = axes[0]
 ialp = 0
-data = np.degrees(PO_data)
+# data = np.degrees(PO_data)
 im = ax.hist2d(data[ialp,0,idx_N],data[ialp,1,idx_N],
            bins=np.arange(0,360,histres2D),cmap='magma',density=True,vmax=0.0001)
 # bar = plt.colorbar(im[3])
@@ -498,16 +376,7 @@ plt.tight_layout()
 #%% 
 fig,axes = plt.subplots(2,nparams,figsize=(nparams*2,3),sharex='col')
 idx_N = np.all((rangeresp>params['minrangeresp'],
-                # VM_data[:,3,0,:]!=0, 
-                # VM_data[:,3,1,:]!=0,
-                # np.any(VM_data[:,3,:,:]>0, axis=(0,1)),
-                # ~np.any(VM_data[:,3,:,:]==0, axis=(0,1)),
-                # ~np.any(VM_data[:,3,:,:]<=0, axis=(0,1)),
-                # ~np.any(VM_data[:,3,:,:]>30, axis=(0,1)),
-                # np.any(VM_data[:,3,:,:]<30, axis=(0,1)),
                 ),axis=0)
-trimperc = 2 #trim percentile on each side
-
 binedges = [4*np.arange(-0.2,0.2,0.01),np.arange(-0.2,0.2,0.01),
                      np.arange(-180,180,5),np.arange(-15,16,1),
                      np.arange(-0.1,0.1,0.005)]
@@ -524,8 +393,7 @@ for iparam,param in enumerate(param_names):
 
         datadiff = np.mod(datadiff + 180,360) - 180  #wrap to -180 to 180
         shufdatadiff = np.mod(shufdatadiff + 180,360) - 180  #wrap to -180 to 180
-
-        # bins = np.linspace(np.nanpercentile(datadiff[idx_N],trimperc),np.nanpercentile(datadiff[idx_N],100-trimperc),20)
+        print('n = %d neurons' % np.sum(~np.isnan(datadiff[idx_N])))
         bins = binedges[iparam]
         sns.histplot(datadiff[idx_N],color=clrs_arealabelpairs[ialp],element="bars",stat="probability", 
                     common_norm=False,alpha=0.2,ax=ax,bins=bins)
@@ -534,24 +402,17 @@ for iparam,param in enumerate(param_names):
 
         if ialp==1: 
             ax.set_xlabel(param)
-        # if iparam==0: 
         ax.set_ylabel(f'Fraction')
-        # else:
-            # ax.set_ylabel('')
-        # if iparam==0:
-        # ax.text(0.5,0.8,'%s (High-low)' % legendlabels[ialp],color=clrs_arealabelpairs[ialp],transform=ax.transAxes,fontsize=7)
-        # ax.text(0.5,0.6,'Shuffle',color='grey',transform=ax.transAxes,fontsize=7)
 
 plt.tight_layout()
 sns.despine(fig,top=True,right=True,offset=2)
-my_savefig(fig,savedir,'VonMises_TuningParameters_Diff_FF_FB')
+# my_savefig(fig,savedir,'VonMises_TuningParameters_Diff_FF_FB')
 
 #%% 
 # fig,axes = plt.subplots(2,nparams,figsize=(nparams*3*cm,7*cm),sharex='col')
 fig,axes = plt.subplots(2,nparams,figsize=(nparams*3.5*cm,7*cm),sharex=False)
 
 trimperc = 3 #trim percentile on each side
-
 for imodsign,modsign in enumerate([-1,1]):
     signlabel = 'excited' if modsign==1 else 'inhibited'
     idx_N = np.all((

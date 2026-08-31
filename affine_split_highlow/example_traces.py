@@ -18,7 +18,6 @@ import seaborn as sns
 
 from loaddata.session_info import filter_sessions,load_sessions
 from utils.tuning import *
-from utils.psth import compute_respmat
 from utils.plot_lib import * #get all the fixed color schemes
 from utils.explorefigs import plot_excerpt,plot_PCA_gratings,plot_tuned_response
 from params import load_params

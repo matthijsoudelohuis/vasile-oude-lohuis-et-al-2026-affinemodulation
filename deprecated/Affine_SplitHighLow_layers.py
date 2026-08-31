@@ -129,14 +129,14 @@ error_resp_split        = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 mean_resp_split_aligned = np.full((narealabelpairs,nOris,2,nCells),np.nan)
 
 #Regression output:
-nboots                  = 0
-# nboots                  = 250
+# nboots                  = 0
+nboots                  = 250
 params_regress          = np.full((nCells,narealabelpairs,3),np.nan)
 sig_params_regress      = np.full((nCells,narealabelpairs,2),np.nan)
 
 ndprimeboots            = 1000
 # ndprimeboots = 0
-dprimedata              = np.full((narealabelpairs,nCells),np.nan)
+dprimedata             = np.full((narealabelpairs,nCells),np.nan)
 dprimesig              = np.full((narealabelpairs,nCells),np.nan)
 
 for ises in tqdm(range(nSessions),total=nSessions,desc='Computing corr rates and affine mod'):
@@ -351,7 +351,7 @@ for ipair,pair in enumerate(np.array([[0,1]])):
                          [nsigmat[isign,pair[1]], ntotalmat[isign,pair[1]]-nsigmat[isign,pair[1]]]])
         if np.any(data[:,0]):
             chival,pval = stats.chi2_contingency(data)[:2]  # p-value
-            print('%s vs %s: %s: chi=%1.2f, p=%1.4f' % (legendlabels[pair[0]],legendlabels[pair[1]],
+            print('%s vs %s: %s: chi=%1.2f, p=%2.2g' % (legendlabels[pair[0]],legendlabels[pair[1]],
                                                       signlabels[isign],chival,pval))
 
 
@@ -386,6 +386,64 @@ for ax in axes:
 # my_savefig(fig,savedir,'Dprime_Sign_BarChart_FB_Layers_%dsessions' % nSessions)
 my_savefig(fig,savedir,'Dprime_Sign_BarChart_FF_Layers_%dsessions' % nSessions)
 
+#%% Show pie chart of significant correlation for feedforward and feedback:
+fracmat = np.empty((3,narealabelpairs,nSessions))
+nsigmat = np.empty((3,narealabelpairs,nSessions))
+ntotalmat = np.empty((3,narealabelpairs,nSessions))
+
+signorder = [-1,0,1]
+signlabels = ['Neg','None','Pos']
+signorder = [-1,1,0]
+signlabels = ['Neg','Pos','None']   
+clrs_signs = ['#0033B3','#E66804','#808080']
+for ialp,alp in enumerate(arealabelpairs):
+    for isign,sign in enumerate(signorder):
+        for ises in range(nSessions):
+            idx_N = np.all((~np.isnan(dprimedata[ialp,:]),
+                            celldata['session_id']==sessions[ises].session_id,
+                            rangeresp>params['minrangeresp']),axis=0)
+
+            nsigmat[isign,ialp,ises] = np.sum(dprimesig[ialp,idx_N]==sign)
+            ntotalmat[isign,ialp,ises] = np.sum(idx_N)
+            fracmat[isign,ialp,ises] = np.sum(dprimesig[ialp,idx_N]==sign) / np.sum(idx_N)
+
+#%% Make it a bar chart, but per session:
+from scipy.stats import ttest_ind,wilcoxon,ranksums
+fig,axes = plt.subplots(1,2,figsize=(2*1.6*cm,3.5*cm),sharey=True)
+for isign,sign in enumerate(signorder[:2]): #signorder[:2]
+# for isign,sign in [enumerate(signorder[1:])]: #signorder[:2]
+    ax = axes[isign]
+    ax.bar([0,1],np.nanmean(fracmat[isign],axis=1),width=0.6,color=clrs_signs[isign],edgecolor='black',linewidth=0.8,alpha=0.7)
+    # ax.bar([0,1],fracmat[isign,:],width=0.6,color=clrs_signs[isign],edgecolor='black',linewidth=0.8,alpha=0.7)
+    # ax.errorbar([0,1],np.nanmean(fracmat[isign],axis=1),yerr=np.nanstd(fracmat[isign],axis=1) / np.sqrt(np.sum(~np.isnan(fracmat[isign,0]))))
+                # color=clrs_signs[isign],fmt='o',linewidth=0.8,alpha=0.7)
+    ax.scatter(np.zeros(nSessions),fracmat[isign,0],s=3,marker='.',color='k',
+               edgecolor='black',alpha=1)
+    ax.scatter(np.ones(nSessions),fracmat[isign,1],s=3,marker='.',color='k',
+               edgecolor='black',alpha=1)
+    if isign == 0 and ipair == 0:
+        ax.set_ylabel('Fraction of cells')
+    print('%s\nn=%d cells (%s)\nn=%d cells (%s)' % (
+                                                    signlabels[isign],
+                                                    np.sum(~np.isnan(dprimesig[0,:])),
+                                                    legendlabels[0],
+                                                    np.sum(~np.isnan(dprimesig[1,:])),
+                                                    legendlabels[1],
+                                                    ))
+    ax.set_title('%s' % signlabels[isign],fontsize=6)
+    t,pval = ranksums(fracmat[isign,0,:],fracmat[isign,1,:],nan_policy='omit')
+    print('t=%1.2f,p=%2.2g' % (t,pval))
+    # add_paired_ttest_results(ax,fracmat[isign,0,:],fracmat[isign,1,:],pos=[0.5,0.8],fontsize=6)
+    add_stat_annotation(ax,x1=0,x2=1,y=0.18,h=0.01,p=pval)
+
+sns.despine(fig=fig, top=True, right=True,offset=2)
+for ax in axes:
+    ax.set_xticks([0,1],labels=[legendlabels[0],legendlabels[1]],fontsize=4,rotation=90)
+
+my_savefig(fig,savedir,'Dprime_Sign_BarChart_FB_Layers_%dsessions_stats' % nSessions)
+# my_savefig(fig,savedir,'Dprime_Sign_BarChart_FF_Layers_%dsessions' % nSessions)
+
+
 #%% Fraction of significant multiplicative and additively modulated cells:
 modsign = -1
 orderversion = 1
@@ -401,47 +459,65 @@ else:
 #%% Make the figure:
 fig,axes = plt.subplots(1,1,figsize=(4.5*cm,3.8*cm))
 ax = axes
-sigmat = np.empty((3,2))
-countmat = np.empty((3,2))
+sigmat = np.empty((3,2,nSessions))
+countmat = np.empty((3,2,nSessions))
 barwidth = 0.5
 ncomparisons = 8
 for iafftype in [0,1]: # 0 = multiplicative, 1 = additive
     for iaffsign,affsign in enumerate([1,-1]): # 1 = positive, -1 = negative
-        fracs = np.empty((2))
+        fracs = np.empty((2,nSessions))
         for ialp,alp in enumerate(arealabelpairs):
-            Nsig = np.sum(np.all((
-                        dprimesig[ialp,:]==modsign,
-                        sig_params_regress[:,ialp,iafftype]==affsign,
-                        rangeresp>params['minrangeresp'],
-                            ),axis=0))
-            Ntotal = np.sum(np.all((
-                        ~np.isnan(sig_params_regress[:,ialp,iafftype]),
-                        dprimesig[ialp,:]==modsign,
-                        rangeresp>params['minrangeresp'],
-                            ),axis=0))
-            sigmat[iafftype,ialp] = Nsig
-            countmat[iafftype,ialp] = Ntotal
-            fracs[ialp] = Nsig/Ntotal
+            for ises in range(nSessions):
+                Nsig = np.sum(np.all((
+                            celldata['session_id']==sessions[ises].session_id,
+                            dprimesig[ialp,:]==modsign,
+                            sig_params_regress[:,ialp,iafftype]==affsign,
+                            rangeresp>params['minrangeresp'],
+                                ),axis=0))
+                Ntotal = np.sum(np.all((
+                            celldata['session_id']==sessions[ises].session_id,
+                            ~np.isnan(sig_params_regress[:,ialp,iafftype]),
+                            dprimesig[ialp,:]==modsign,
+                            rangeresp>params['minrangeresp'],
+                                ),axis=0))
+                sigmat[iafftype,ialp,ises] = Nsig
+                countmat[iafftype,ialp,ises] = Ntotal
+                fracs[ialp,ises] = Nsig/Ntotal
 
             if orderversion==1: 
                 xpos = iaffsign*2 + iafftype*4 + (ialp*2-1) * barwidth/1.5
             else: 
                 xpos = iafftype*2 + iaffsign*4 + (ialp*2-1) * barwidth/1.5
-            print(xpos)
-            ax.bar(xpos,fracs[ialp],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
-        
+            # print(xpos)
+                # ax.bar(xpos,fracs[ialp],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
+
+            ax.bar(xpos,np.nanmean(fracs[ialp]),width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='black',linewidth=0.5)
+            ax.scatter(np.ones(nSessions)*xpos,fracs[ialp],s=3,marker='.',color='k',
+                    edgecolor='black',alpha=1)
+            # ax.scatter(np.ones(nSessions),fracmat[isign,1],s=3,marker='.',color='k',
+            #         edgecolor='black',alpha=1)
+            # if isign == 0 and ipair == 0:
+            #     ax.set_ylabel('Fraction of cells')
+        if iafftype==0 and iaffsign==0: 
+            print('n=%d cells from n=%d sessions (%s)\nn=%d cells from n=%d sessions (%s)' % (
+                                                        np.sum(countmat[iafftype,0]),
+                                                        np.sum(~np.isnan(fracs[0,:])),
+                                                        legendlabels[0],
+                                                        np.sum(countmat[iafftype,1]),
+                                                        np.sum(~np.isnan(fracs[1,:])),
+                                                        legendlabels[1],
+                                                        ))
+            
         if np.any(fracs>0):
-            pval = stats.chi2_contingency([[sigmat[iafftype,0], countmat[iafftype,0]-sigmat[iafftype,0]],
-                                [sigmat[iafftype,1], countmat[iafftype,1]-sigmat[iafftype,1]]])[1]
-            pval = np.clip(pval*ncomparisons,0,1)
-            # print(pval)
+            t,pval = ranksums(fracs[0,:],fracs[1,:],nan_policy='omit')
+            print('t=%1.2f,p=%2.2g' % (t,pval))
             if orderversion==1: 
                 xpos = iaffsign*2 + iafftype*4 + (np.array([0,1])*2-1) * barwidth/1.5
             else: 
                 xpos = iafftype*2 + iaffsign*4 + (np.array([0,1])*2-1) * barwidth/1.5
-            add_stat_annotation(ax,xpos[0],xpos[1],np.max(fracs)+0.05,pval,h=0,fontsize=7)
-ax.text(0.4, 0.9, '%s (n=%d)' % (legendlabels[0],countmat[0,0]), fontsize=5,color=clrs_arealabelpairs[0],transform=ax.transAxes)
-ax.text(0.4, 0.8, '%s (n=%d)' % (legendlabels[1],countmat[0,1]), fontsize=5,color=clrs_arealabelpairs[1],transform=ax.transAxes)
+            add_stat_annotation(ax,xpos[0],xpos[1],np.nanmax(fracs)+0.05,pval,h=0,fontsize=7)
+ax.text(0.4, 0.9, '%s (n=%d)' % (legendlabels[0],np.sum(countmat[0,0])), fontsize=5,color=clrs_arealabelpairs[0],transform=ax.transAxes)
+ax.text(0.4, 0.8, '%s (n=%d)' % (legendlabels[1],np.sum(countmat[0,1])), fontsize=5,color=clrs_arealabelpairs[1],transform=ax.transAxes)
 
 ax_nticks(ax,4)
 ax.set_xticks(np.arange(4)*2,affinelabels)
@@ -450,10 +526,64 @@ ax.set_yticks(np.arange(0,1.1,0.2))
 ax.set_ylim([0,1])
 plt.tight_layout()
 sns.despine(fig=fig, top=True, right=True,offset=1,trim=False)
-my_savefig(fig,savedir,'%s_Affinemodulation_Layers_%s_cells_%dsessions' % (direction,signlabel,nSessions))
+my_savefig(fig,savedir,'%s_Affinemodulation_Layers_%s_%dsessions' % (direction,signlabel,nSessions))
+
+#%% Make the figure:
+# fig,axes = plt.subplots(1,1,figsize=(4.5*cm,3.8*cm))
+# ax = axes
+# sigmat = np.empty((3,2))
+# countmat = np.empty((3,2))
+# barwidth = 0.5
+# ncomparisons = 8
+# for iafftype in [0,1]: # 0 = multiplicative, 1 = additive
+#     for iaffsign,affsign in enumerate([1,-1]): # 1 = positive, -1 = negative
+#         fracs = np.empty((2))
+#         for ialp,alp in enumerate(arealabelpairs):
+#             Nsig = np.sum(np.all((
+#                         dprimesig[ialp,:]==modsign,
+#                         sig_params_regress[:,ialp,iafftype]==affsign,
+#                         rangeresp>params['minrangeresp'],
+#                             ),axis=0))
+#             Ntotal = np.sum(np.all((
+#                         ~np.isnan(sig_params_regress[:,ialp,iafftype]),
+#                         dprimesig[ialp,:]==modsign,
+#                         rangeresp>params['minrangeresp'],
+#                             ),axis=0))
+#             sigmat[iafftype,ialp] = Nsig
+#             countmat[iafftype,ialp] = Ntotal
+#             fracs[ialp] = Nsig/Ntotal
+
+#             if orderversion==1: 
+#                 xpos = iaffsign*2 + iafftype*4 + (ialp*2-1) * barwidth/1.5
+#             else: 
+#                 xpos = iafftype*2 + iaffsign*4 + (ialp*2-1) * barwidth/1.5
+#             print(xpos)
+#             ax.bar(xpos,fracs[ialp],width=barwidth,color=clrs_arealabelpairs[ialp],edgecolor='k',linewidth=0.5)
+        
+#         if np.any(fracs>0):
+#             pval = stats.chi2_contingency([[sigmat[iafftype,0], countmat[iafftype,0]-sigmat[iafftype,0]],
+#                                 [sigmat[iafftype,1], countmat[iafftype,1]-sigmat[iafftype,1]]])[1]
+#             pval = np.clip(pval*ncomparisons,0,1)
+#             # print(pval)
+#             if orderversion==1: 
+#                 xpos = iaffsign*2 + iafftype*4 + (np.array([0,1])*2-1) * barwidth/1.5
+#             else: 
+#                 xpos = iafftype*2 + iaffsign*4 + (np.array([0,1])*2-1) * barwidth/1.5
+#             add_stat_annotation(ax,xpos[0],xpos[1],np.max(fracs)+0.05,pval,h=0,fontsize=7)
+# ax.text(0.4, 0.9, '%s (n=%d)' % (legendlabels[0],countmat[0,0]), fontsize=5,color=clrs_arealabelpairs[0],transform=ax.transAxes)
+# ax.text(0.4, 0.8, '%s (n=%d)' % (legendlabels[1],countmat[0,1]), fontsize=5,color=clrs_arealabelpairs[1],transform=ax.transAxes)
+
+# ax_nticks(ax,4)
+# ax.set_xticks(np.arange(4)*2,affinelabels)
+# ax.set_ylabel('Fraction of %s neurons' % signlabel)
+# ax.set_yticks(np.arange(0,1.1,0.2))
+# ax.set_ylim([0,1])
+# plt.tight_layout()
+# sns.despine(fig=fig, top=True, right=True,offset=1,trim=False)
+# # my_savefig(fig,savedir,'%s_Affinemodulation_Layers_%s_cells_%dsessions' % (direction,signlabel,nSessions))
 
 
-# #%% Fraction of significant multiplicative and additively modulated cells:
+#%% Fraction of significant multiplicative and additively modulated cells:
 # sign = 1
 # fig,axes = plt.subplots(1,1,figsize=(6*cm,4*cm))
 # ax = axes
